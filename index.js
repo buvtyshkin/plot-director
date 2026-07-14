@@ -99,24 +99,55 @@ function patchFromContext() {
 }
 
 // ── Plot Data Helpers ────────────────────────────────────────
+// Module-level cache — guarantees data survives getContext() inconsistencies
+let _plotCache = {};
+
+function _chatId() {
+    const ctx = getContext();
+    return ctx?.chatId || "default";
+}
 
 function getPlotData() {
+    const id = _chatId();
+    // Module cache first (always reliable)
+    if (_plotCache[id]) return _plotCache[id];
+    // Try loading from chat_metadata
     const ctx = getContext();
-    return ctx?.chat_metadata?.plot_director ?? null;
+    const stored = ctx?.chat_metadata?.plot_director;
+    if (stored) {
+        _plotCache[id] = stored;
+        return stored;
+    }
+    return null;
 }
 
 function savePlotData(data) {
-    const ctx = getContext();
-    if (!ctx.chat_metadata) ctx.chat_metadata = {};
-    ctx.chat_metadata.plot_director = data;
-    if (saveChatDebounced) saveChatDebounced();
+    const id = _chatId();
+    // Save to module cache
+    _plotCache[id] = data;
+    // Also persist to chat_metadata for cross-session storage
+    try {
+        const ctx = getContext();
+        if (!ctx.chat_metadata) ctx.chat_metadata = {};
+        ctx.chat_metadata.plot_director = data;
+        if (saveChatDebounced) saveChatDebounced();
+    } catch (e) {
+        console.warn("[Plot Director] chat_metadata save failed:", e);
+    }
+    console.log(`[Plot Director] Data saved for chat ${id}, steps: ${data?.steps?.length}, current: ${data?.currentIndex}`);
 }
 
 function clearPlotData() {
-    const ctx = getContext();
-    if (ctx.chat_metadata) delete ctx.chat_metadata.plot_director;
+    const id = _chatId();
+    delete _plotCache[id];
+    try {
+        const ctx = getContext();
+        if (ctx.chat_metadata) delete ctx.chat_metadata.plot_director;
+        if (saveChatDebounced) saveChatDebounced();
+    } catch (e) {
+        console.warn("[Plot Director] clear failed:", e);
+    }
     if (setExtensionPrompt) setExtensionPrompt(INJECTION_ID, "", 1, 1, true, "system");
-    if (saveChatDebounced) saveChatDebounced();
 }
 
 function newPlotData(steps, settings) {
@@ -281,6 +312,18 @@ function onMessageSwiped(messageIndex) {
 }
 
 function onChatChanged() {
+    // Force reload from chat_metadata into cache on chat switch
+    const id = _chatId();
+    try {
+        const ctx = getContext();
+        const stored = ctx?.chat_metadata?.plot_director;
+        if (stored) {
+            _plotCache[id] = stored;
+        } else {
+            delete _plotCache[id];
+        }
+    } catch (e) { /* ignore */ }
+
     const pd = getPlotData();
     if (pd && pd.steps.length > 0) {
         injectCurrentStep();

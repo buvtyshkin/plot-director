@@ -15,7 +15,6 @@ import {
     event_types,
     generateQuietPrompt,
     saveChatDebounced,
-    saveMetadataDebounced,
 } from "../../../../script.js";
 
 // ── Constants ────────────────────────────────────────────────
@@ -81,14 +80,14 @@ function savePlotData(data) {
     const ctx = getContext();
     if (!ctx.chat_metadata) ctx.chat_metadata = {};
     ctx.chat_metadata.plot_director = data;
-    saveMetadataDebounced();
+    saveChatDebounced();
 }
 
 function clearPlotData() {
     const ctx = getContext();
     if (ctx.chat_metadata) delete ctx.chat_metadata.plot_director;
     setExtensionPrompt(INJECTION_ID, "", 1, 1, true, "system");
-    saveMetadataDebounced();
+    saveChatDebounced();
 }
 
 function newPlotData(steps, settings) {

@@ -7,7 +7,6 @@ import {
     extension_settings,
     getContext,
     setExtensionPrompt,
-    saveSettingsDebounced,
 } from "../../../extensions.js";
 
 import {
@@ -104,7 +103,7 @@ function newPlotData(steps, settings) {
 function getSettings() {
     if (!extension_settings[EXT_NAME]) {
         extension_settings[EXT_NAME] = { ...DEFAULT_SETTINGS };
-        saveSettingsDebounced();
+        saveChatDebounced(); // persist settings
     }
     return extension_settings[EXT_NAME];
 }
@@ -593,7 +592,7 @@ function showGenerateModal() {
         s.defaultGenre     = opts.genre;
         s.defaultEpicness  = opts.epicness;
         s.defaultRealism   = opts.realism;
-        saveSettingsDebounced();
+        saveChatDebounced(); // persist settings
 
         // Show loading state
         $(".pd-modal-body").html(`
@@ -834,14 +833,14 @@ jQuery(async () => {
     $("#pd_toggle_enabled").on("change", function () {
         const s = getSettings();
         s.enabled = this.checked;
-        saveSettingsDebounced();
+        saveChatDebounced(); // persist settings
         injectCurrentStep();
     });
 
     $("#pd_toggle_autoregen").on("change", function () {
         const s = getSettings();
         s.autoRegenTail = this.checked;
-        saveSettingsDebounced();
+        saveChatDebounced(); // persist settings
     });
 
     // Event listeners

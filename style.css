@@ -6,7 +6,7 @@
     padding: 6px 8px;
     margin-bottom: 8px;
     border-radius: 4px;
-    background: var(--SmartThemeBlurTintColor, rgba(0,0,0,0.2));
+    background: rgba(0,0,0,0.25);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -50,25 +50,25 @@
 .pd-modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.75);
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(3px);
 }
 
 .pd-modal {
-    background: var(--SmartThemeBodyColor, #1a1a2e);
-    color: var(--SmartThemeBodyColor, #eee);
-    border: 1px solid var(--SmartThemeBorderColor, #444);
+    background: #1a1b2e;
+    color: #ddd;
+    border: 1px solid #3a3b4e;
     border-radius: 8px;
     width: 90%;
     max-width: 560px;
     max-height: 85vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
 }
 
 .pd-modal-header {
@@ -76,9 +76,10 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    border-bottom: 1px solid var(--SmartThemeBorderColor, #444);
+    border-bottom: 1px solid #3a3b4e;
     font-size: 1.05em;
     font-weight: 600;
+    color: #eee;
 }
 
 .pd-modal-close {
@@ -88,7 +89,7 @@
     transition: opacity 0.15s;
     background: none;
     border: none;
-    color: inherit;
+    color: #ccc;
     padding: 2px 6px;
 }
 
@@ -105,7 +106,7 @@
     justify-content: flex-end;
     gap: 8px;
     padding: 12px 16px;
-    border-top: 1px solid var(--SmartThemeBorderColor, #444);
+    border-top: 1px solid #3a3b4e;
 }
 
 /* --- Form Controls --- */
@@ -117,7 +118,7 @@
     display: block;
     font-size: 0.85em;
     margin-bottom: 4px;
-    opacity: 0.8;
+    color: #aaa;
 }
 
 .pd-field select,
@@ -125,10 +126,10 @@
 .pd-field input[type="text"] {
     width: 100%;
     padding: 6px 8px;
-    border: 1px solid var(--SmartThemeBorderColor, #444);
+    border: 1px solid #3a3b4e;
     border-radius: 4px;
-    background: rgba(0,0,0,0.25);
-    color: inherit;
+    background: #12132a;
+    color: #ddd;
     font-family: inherit;
     font-size: 0.9em;
     box-sizing: border-box;
@@ -140,7 +141,8 @@
 }
 
 .pd-field select option {
-    background: #1a1a2e;
+    background: #12132a;
+    color: #ddd;
 }
 
 .pd-range-row {
@@ -151,7 +153,7 @@
 
 .pd-range-row input[type="range"] {
     flex: 1;
-    accent-color: var(--SmartThemeQuoteColor, #e88c3a);
+    accent-color: #e88c3a;
 }
 
 .pd-range-val {
@@ -159,6 +161,7 @@
     text-align: center;
     font-size: 0.9em;
     font-weight: 600;
+    color: #eee;
 }
 
 /* --- Step List --- */
@@ -187,7 +190,7 @@
 }
 
 .pd-step-item.active .pd-step-badge {
-    background: var(--SmartThemeQuoteColor, #e88c3a);
+    background: #e88c3a;
     animation: pd-pulse 2s ease-in-out infinite;
 }
 
@@ -204,6 +207,7 @@
     justify-content: center;
     font-size: 0.75em;
     font-weight: 700;
+    color: #fff;
     flex-shrink: 0;
     margin-top: 2px;
 }
@@ -217,6 +221,7 @@
     font-size: 0.88em;
     line-height: 1.45;
     word-break: break-word;
+    color: #ccc;
 }
 
 .pd-step-text.spoiler-blur {
@@ -245,17 +250,17 @@
 .pd-step-actions button {
     background: none;
     border: 1px solid rgba(255,255,255,0.15);
-    color: inherit;
+    color: #aaa;
     padding: 2px 6px;
     border-radius: 3px;
     cursor: pointer;
     font-size: 0.8em;
-    opacity: 0.6;
     transition: opacity 0.15s;
 }
 
 .pd-step-actions button:hover {
-    opacity: 1;
+    color: #eee;
+    border-color: rgba(255,255,255,0.3);
 }
 
 /* --- Edit Step Inline --- */
@@ -264,10 +269,10 @@
     min-height: 50px;
     margin-top: 6px;
     padding: 6px;
-    border: 1px solid var(--SmartThemeBorderColor, #444);
+    border: 1px solid #3a3b4e;
     border-radius: 4px;
-    background: rgba(0,0,0,0.2);
-    color: inherit;
+    background: #12132a;
+    color: #ddd;
     font-family: inherit;
     font-size: 0.85em;
     resize: vertical;
@@ -287,14 +292,14 @@
     width: 32px;
     height: 32px;
     border: 3px solid rgba(255,255,255,0.15);
-    border-top-color: var(--SmartThemeQuoteColor, #e88c3a);
+    border-top-color: #e88c3a;
     border-radius: 50%;
     animation: pd-spin 0.8s linear infinite;
 }
 
 .pd-loading-text {
     font-size: 0.9em;
-    opacity: 0.7;
+    color: #999;
 }
 
 @keyframes pd-spin {
@@ -315,7 +320,7 @@
 
 .pd-note {
     font-size: 0.8em;
-    opacity: 0.5;
+    color: #777;
     font-style: italic;
     margin-top: 4px;
 }
@@ -323,6 +328,6 @@
 .pd-empty-state {
     text-align: center;
     padding: 24px 16px;
-    opacity: 0.5;
+    color: #666;
     font-size: 0.9em;
 }

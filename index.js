@@ -61,81 +61,83 @@ function patchFromContext() {
     return true;
 }
 
-// ── Plot Data — triple storage: extension_settings (persistent) + chat_metadata + memory cache
+// ── Plot Data — using ST context API (the documented way) ────
+// Per-chat data: ctx.chatMetadata + ctx.saveMetadataDebounced()
+// Extension settings: ctx.extensionSettings + ctx.saveSettingsDebounced()
 
 let _plotCache = {};
 function _chatId() { const c = getContext(); return c?.chatId || "default"; }
 
-function _ensurePlotsObj() {
-    if (!extension_settings[EXT_NAME]) extension_settings[EXT_NAME] = { ...DEFAULT_SETTINGS };
-    if (!extension_settings[EXT_NAME].plots) extension_settings[EXT_NAME].plots = {};
-    return extension_settings[EXT_NAME].plots;
-}
-
 function getPlotData() {
     const id = _chatId();
-    // 1. Memory cache (fastest)
+    // 1. Memory cache
     if (_plotCache[id]) return _plotCache[id];
-    // 2. extension_settings (persistent across reloads)
-    const plots = _ensurePlotsObj();
-    if (plots[id]) { _plotCache[id] = plots[id]; return plots[id]; }
-    // 3. chat_metadata (fallback)
+    // 2. chatMetadata (server-persisted, per-chat)
     try {
         const ctx = getContext();
-        const s = ctx?.chat_metadata?.plot_director;
-        if (s) { _plotCache[id] = s; plots[id] = s; return s; }
+        const meta = ctx.chatMetadata || ctx.chat_metadata;
+        if (meta?.plot_director) { _plotCache[id] = meta.plot_director; return meta.plot_director; }
+    } catch(e) {}
+    // 3. extensionSettings fallback (global, keyed by chatId)
+    try {
+        const ctx = getContext();
+        const es = ctx.extensionSettings || extension_settings;
+        if (es?.[EXT_NAME]?.plots?.[id]) { _plotCache[id] = es[EXT_NAME].plots[id]; return es[EXT_NAME].plots[id]; }
     } catch(e) {}
     return null;
 }
 
 function savePlotData(data) {
     const id = _chatId();
-    // Write to all three layers
     _plotCache[id] = data;
-    _ensurePlotsObj()[id] = data;
+    const ctx = getContext();
+
+    // Primary: chatMetadata (per-chat, server-side)
     try {
-        const ctx = getContext();
-        if (!ctx.chat_metadata) ctx.chat_metadata = {};
-        ctx.chat_metadata.plot_director = data;
-    } catch(e) {}
-    // Try every save method available
-    _persistSave();
-    console.log("[PD] Saved for chat " + id + ", steps: " + (data?.steps?.length || 0));
+        const meta = ctx.chatMetadata || ctx.chat_metadata;
+        if (meta) {
+            meta.plot_director = data;
+            if (typeof ctx.saveMetadataDebounced === "function") ctx.saveMetadataDebounced();
+            console.log("[PD] Saved via chatMetadata for " + id);
+        }
+    } catch(e) { console.warn("[PD] chatMetadata save err:", e); }
+
+    // Backup: extensionSettings (global, survives chat metadata issues)
+    try {
+        const es = ctx.extensionSettings || extension_settings;
+        if (es) {
+            if (!es[EXT_NAME]) es[EXT_NAME] = {};
+            if (!es[EXT_NAME].plots) es[EXT_NAME].plots = {};
+            es[EXT_NAME].plots[id] = data;
+            if (typeof ctx.saveSettingsDebounced === "function") ctx.saveSettingsDebounced();
+            console.log("[PD] Saved via extensionSettings for " + id);
+        }
+    } catch(e) { console.warn("[PD] extensionSettings save err:", e); }
 }
 
 function clearPlotData() {
     const id = _chatId();
     delete _plotCache[id];
-    const plots = _ensurePlotsObj();
-    delete plots[id];
+    const ctx = getContext();
     try {
-        const ctx = getContext();
-        if (ctx.chat_metadata) delete ctx.chat_metadata.plot_director;
+        const meta = ctx.chatMetadata || ctx.chat_metadata;
+        if (meta) { delete meta.plot_director; if (typeof ctx.saveMetadataDebounced === "function") ctx.saveMetadataDebounced(); }
+    } catch(e) {}
+    try {
+        const es = ctx.extensionSettings || extension_settings;
+        if (es?.[EXT_NAME]?.plots) { delete es[EXT_NAME].plots[id]; if (typeof ctx.saveSettingsDebounced === "function") ctx.saveSettingsDebounced(); }
     } catch(e) {}
     if (setExtensionPrompt) setExtensionPrompt(INJECTION_ID, "", 1, 1, true, "system");
-    _persistSave();
-}
-
-function _persistSave() {
-    // Try multiple save methods — at least one should work
-    try { if (saveChatDebounced) saveChatDebounced(); } catch(e) {}
-    try {
-        const ctx = getContext();
-        if (ctx.saveChat) ctx.saveChat();
-    } catch(e) {}
-    // extension_settings is auto-saved by ST on settings change,
-    // but let's trigger it explicitly via the context if possible
-    try {
-        const ctx = getContext();
-        if (ctx.saveSettings) ctx.saveSettings();
-    } catch(e) {}
 }
 function newPlotData(steps, settings) {
     return { steps: steps.map(t => ({ text: t, completed: false })), currentIndex: 0, lastAdvancedMsg: -1, genSettings: settings };
 }
 function getSettings() {
-    if (!extension_settings[EXT_NAME]) extension_settings[EXT_NAME] = { ...DEFAULT_SETTINGS };
-    return extension_settings[EXT_NAME];
+    // Try context first, then imported module
+    let es;
+    try { const ctx = getContext(); es = ctx.extensionSettings || extension_settings; } catch(e) { es = extension_settings; }
+    if (!es[EXT_NAME]) es[EXT_NAME] = { ...DEFAULT_SETTINGS };
+    return es[EXT_NAME];
 }
 
 // ── Context Gathering (for direct API) ───────────────────────

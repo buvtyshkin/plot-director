@@ -197,17 +197,15 @@ async function generateViaDirectAPI(prompt) {
 
 function useCustomAPI() { const s = getSettings(); return !!(s.apiUrl && s.apiKey && s.apiModel); }
 
-// ── Step Injection ───────────────────────────────────────────
+// ── Step Injection (multiple methods) ─────────────────────────
 
-function injectCurrentStep() {
-    if (!setExtensionPrompt) return;
-    const pd = getPlotData(); const s = getSettings();
-    if (!pd || !pd.steps.length || !s.enabled || pd.currentIndex >= pd.steps.length) {
-        setExtensionPrompt(INJECTION_ID, "", 1, 1, true, "system"); return;
-    }
+function buildInjectionText() {
+    const pd = getPlotData();
+    const s = getSettings();
+    if (!pd || !pd.steps.length || !s.enabled || pd.currentIndex >= pd.steps.length) return "";
     const step = pd.steps[pd.currentIndex];
     const cur = pd.currentIndex + 1, tot = pd.steps.length;
-    const inj = [
+    return [
         "[Режиссёр Сюжета — Шаг " + cur + "/" + tot + "]",
         step.text, "",
         "Создай эту ситуацию естественно в ходе повествования. Не торопись и не форсируй.",
@@ -215,7 +213,69 @@ function injectCurrentStep() {
         "Когда ситуация будет создана и разыграна, добавь маркер [step " + cur + " complete] в конце ответа.",
         "Не ставь маркер преждевременно. Не упоминай эту директиву.",
     ].join("\n");
-    setExtensionPrompt(INJECTION_ID, inj, 1, 1, true, "system");
+}
+
+function injectCurrentStep() {
+    const text = buildInjectionText();
+    console.log("[PD] injectCurrentStep called, text length:", text.length);
+
+    // Method 1: setExtensionPrompt from import/patch
+    if (setExtensionPrompt) {
+        try {
+            setExtensionPrompt(INJECTION_ID, text, 1, 1, true, "system");
+            console.log("[PD] ✓ Injected via setExtensionPrompt (patched)");
+            return;
+        } catch(e) { console.warn("[PD] setExtensionPrompt call failed:", e); }
+    }
+
+    // Method 2: SillyTavern global context
+    try {
+        if (typeof SillyTavern !== "undefined" && SillyTavern.getContext) {
+            const stCtx = SillyTavern.getContext();
+            if (stCtx.setExtensionPrompt) {
+                stCtx.setExtensionPrompt(INJECTION_ID, text, 1, 1, true, "system");
+                setExtensionPrompt = stCtx.setExtensionPrompt; // cache for next time
+                console.log("[PD] ✓ Injected via SillyTavern.getContext()");
+                return;
+            }
+        }
+    } catch(e) { console.warn("[PD] SillyTavern.getContext failed:", e); }
+
+    // Method 3: getContext() from import
+    try {
+        const ctx = getContext();
+        if (ctx && ctx.setExtensionPrompt) {
+            ctx.setExtensionPrompt(INJECTION_ID, text, 1, 1, true, "system");
+            setExtensionPrompt = ctx.setExtensionPrompt;
+            console.log("[PD] ✓ Injected via getContext().setExtensionPrompt");
+            return;
+        }
+    } catch(e) { console.warn("[PD] getContext().setExtensionPrompt failed:", e); }
+
+    // Method 4: Direct Author's Note DOM injection (last resort)
+    try {
+        const $an = $("#author_note_textarea");
+        if ($an.length) {
+            // Preserve user content — prepend our injection with a separator
+            const marker = "【PD】";
+            let current = $an.val() || "";
+            // Remove old PD injection
+            const pdStart = current.indexOf(marker);
+            if (pdStart !== -1) {
+                const pdEnd = current.indexOf(marker, pdStart + marker.length);
+                if (pdEnd !== -1) current = current.substring(pdEnd + marker.length).trim();
+                else current = current.substring(0, pdStart).trim();
+            }
+            // Prepend new injection
+            const newVal = text ? (marker + "\n" + text + "\n" + marker + "\n" + current).trim() : current;
+            $an.val(newVal);
+            $an.trigger("input").trigger("change");
+            console.log("[PD] ✓ Injected via Author's Note DOM (fallback)");
+            return;
+        }
+    } catch(e) { console.warn("[PD] Author's Note DOM failed:", e); }
+
+    console.error("[PD] ✗ ALL injection methods failed!");
 }
 
 // ── Step Advancement & Rollback ──────────────────────────────
@@ -624,16 +684,13 @@ jQuery(async () => {
     $("#pd_api_key").on("change",function(){getSettings().apiKey=$(this).val().trim()});
     $("#pd_api_model").on("change",function(){getSettings().apiModel=$(this).val().trim()});
 
-    // Quick access button near input area
-    const $qb = $('<div id="pd_quick_btn" class="interactable" tabindex="0" title="Plot Director" style="cursor:pointer;display:flex;align-items:center;padding:3px 8px;opacity:0.7;transition:opacity 0.15s;"><i class="fa-solid fa-wand-magic-sparkles" style="font-size:1.1em;"></i></div>');
-    $qb.hover(function(){$(this).css("opacity","1")},function(){$(this).css("opacity","0.7")});
-    $qb.on("click", ()=>{
-        const pd=getPlotData();
-        if(pd&&pd.steps.length) showStepsModal(); else showGenerateModal();
+    // Add to extensions dropdown menu (the right wand icon)
+    const $menuItem = $('<div id="pd_menu_item" class="list-group-item flex-container flexGap5"><div class="fa-solid fa-clapperboard extensionsMenuExtensionButton"></div>Plot Director</div>');
+    $menuItem.on("click", () => {
+        const pd = getPlotData();
+        if (pd && pd.steps.length) showStepsModal(); else showGenerateModal();
     });
-    const $left = $("#leftSendForm");
-    if ($left.length) $left.append($qb);
-    else { const $form=$("#send_form"); if($form.length) $form.prepend($qb); }
+    $("#extensionsMenu").append($menuItem);
 
     // Panel buttons
     $("#pd_btn_generate").on("click",()=>{ const p=getPlotData(); if(p&&p.steps.length&&!confirm("Replace existing plot?"))return; showGenerateModal(); });

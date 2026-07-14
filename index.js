@@ -215,67 +215,26 @@ function buildInjectionText() {
     ].join("\n");
 }
 
+function onPromptReady(data) {
+    try {
+        if (!data || data.dryRun) return; // skip token-counting dry runs
+        const text = buildInjectionText();
+        if (!text) return;
+        const chat = data.chat;
+        if (!Array.isArray(chat)) { console.warn("[PD] prompt data.chat is not an array"); return; }
+        // Insert at depth 1: right before the last message
+        const insertAt = Math.max(0, chat.length - 1);
+        chat.splice(insertAt, 0, { role: "system", content: text });
+        console.log("[PD] ✓ Step injected into outgoing prompt at " + insertAt + "/" + chat.length);
+    } catch(e) {
+        console.error("[PD] onPromptReady error:", e);
+    }
+}
+
+// No pre-registration needed — injection happens per-generation in onPromptReady.
 function injectCurrentStep() {
     const text = buildInjectionText();
-    console.log("[PD] injectCurrentStep called, text length:", text.length);
-
-    // Method 1: setExtensionPrompt from import/patch
-    if (setExtensionPrompt) {
-        try {
-            setExtensionPrompt(INJECTION_ID, text, 1, 1, true, "system");
-            console.log("[PD] ✓ Injected via setExtensionPrompt (patched)");
-            return;
-        } catch(e) { console.warn("[PD] setExtensionPrompt call failed:", e); }
-    }
-
-    // Method 2: SillyTavern global context
-    try {
-        if (typeof SillyTavern !== "undefined" && SillyTavern.getContext) {
-            const stCtx = SillyTavern.getContext();
-            if (stCtx.setExtensionPrompt) {
-                stCtx.setExtensionPrompt(INJECTION_ID, text, 1, 1, true, "system");
-                setExtensionPrompt = stCtx.setExtensionPrompt; // cache for next time
-                console.log("[PD] ✓ Injected via SillyTavern.getContext()");
-                return;
-            }
-        }
-    } catch(e) { console.warn("[PD] SillyTavern.getContext failed:", e); }
-
-    // Method 3: getContext() from import
-    try {
-        const ctx = getContext();
-        if (ctx && ctx.setExtensionPrompt) {
-            ctx.setExtensionPrompt(INJECTION_ID, text, 1, 1, true, "system");
-            setExtensionPrompt = ctx.setExtensionPrompt;
-            console.log("[PD] ✓ Injected via getContext().setExtensionPrompt");
-            return;
-        }
-    } catch(e) { console.warn("[PD] getContext().setExtensionPrompt failed:", e); }
-
-    // Method 4: Direct Author's Note DOM injection (last resort)
-    try {
-        const $an = $("#author_note_textarea");
-        if ($an.length) {
-            // Preserve user content — prepend our injection with a separator
-            const marker = "【PD】";
-            let current = $an.val() || "";
-            // Remove old PD injection
-            const pdStart = current.indexOf(marker);
-            if (pdStart !== -1) {
-                const pdEnd = current.indexOf(marker, pdStart + marker.length);
-                if (pdEnd !== -1) current = current.substring(pdEnd + marker.length).trim();
-                else current = current.substring(0, pdStart).trim();
-            }
-            // Prepend new injection
-            const newVal = text ? (marker + "\n" + text + "\n" + marker + "\n" + current).trim() : current;
-            $an.val(newVal);
-            $an.trigger("input").trigger("change");
-            console.log("[PD] ✓ Injected via Author's Note DOM (fallback)");
-            return;
-        }
-    } catch(e) { console.warn("[PD] Author's Note DOM failed:", e); }
-
-    console.error("[PD] ✗ ALL injection methods failed!");
+    console.log("[PD] Step staged for next generation, length: " + text.length);
 }
 
 // ── Step Advancement & Rollback ──────────────────────────────
@@ -707,6 +666,13 @@ jQuery(async () => {
         eventSource.on(event_types.MESSAGE_RECEIVED, idx=>onMessageReceived(idx));
         eventSource.on(event_types.MESSAGE_SWIPED, idx=>onMessageSwiped(idx));
         eventSource.on(event_types.CHAT_CHANGED, ()=>onChatChanged());
+        // Prompt interception — the core injection mechanism
+        if (event_types.CHAT_COMPLETION_PROMPT_READY) {
+            eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, data=>onPromptReady(data));
+            console.log("[PD] Prompt interception registered (CHAT_COMPLETION_PROMPT_READY).");
+        } else {
+            console.error("[PD] CHAT_COMPLETION_PROMPT_READY not found in event_types! Available:", Object.keys(event_types).filter(k=>k.includes("PROMPT")));
+        }
     }
     onChatChanged();
     console.log("[PD] Plot Director loaded.");

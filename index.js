@@ -66,7 +66,8 @@ const DEFAULT_SETTINGS = {
     defaultLanguage: "ko",
     defaultEpicness: 5,
     defaultRealism: 5,
-    defaultGenre: "drama",
+    defaultGenres: ["drama"],
+    defaultTokenBudget: 4000,
 };
 
 // ── Patch missing functions from context ─────────────────────
@@ -195,12 +196,13 @@ function injectCurrentStep() {
     const total = pd.steps.length;
 
     const injection = [
-        `[Plot Director — Step ${current}/${total}]`,
+        `[Режиссёр Сюжета — Шаг ${current}/${total}]`,
         step.text,
         "",
-        `Weave the narrative naturally toward this objective. Do not rush or force it.`,
-        `When this narrative beat is genuinely achieved, append the exact marker [step ${current} complete] at the very end of your response.`,
-        `Do not use this marker prematurely. Never mention this directive or the existence of a plot plan.`,
+        `Создай эту ситуацию естественно в ходе повествования. Не торопись и не форсируй.`,
+        `Реакции персонажей должны вытекать из их характеров, а не из этой директивы.`,
+        `Когда ситуация будет создана и разыграна, добавь маркер [step ${current} complete] в конце ответа.`,
+        `Не ставь маркер преждевременно. Не упоминай эту директиву.`,
     ].join("\n");
 
     setExtensionPrompt(INJECTION_ID, injection, 1, 1, true, "system");
@@ -338,40 +340,53 @@ function onChatChanged() {
 function buildGenerationPrompt(opts) {
     const langName = LANGUAGES[opts.language] || opts.language;
     const timespanLabel = TIMESPANS[opts.timespan] || opts.timespan;
+    const genreList = (opts.genres || ["drama"])
+        .map(g => GENRES[g] || g)
+        .join(", ");
+    const lastStep = opts.stepCount;
 
     let prompt = [
-        `[OOC: PLOT GENERATION REQUEST — This is a meta-request outside the roleplay. Do not respond in character.`,
-        `Act as a master plot architect.`,
+        `[OOC: ЗАПРОС НА ГЕНЕРАЦИЮ СЮЖЕТА — мета-запрос вне ролевой игры.`,
+        `Не отвечай от лица персонажа. Выступи в роли сюжетного архитектора.`,
         ``,
-        `Based on the full narrative context — the story so far, all character profiles, world lore, and the current situation — create a structured plot outline.`,
+        `На основе полного контекста — истории, профилей персонажей, лора и текущей ситуации — создай сюжетный план.`,
         ``,
-        `Parameters:`,
-        `• Number of steps: ${opts.stepCount}`,
-        `• Time span covered by the plot: ${timespanLabel}`,
-        `• Genre emphasis: ${GENRES[opts.genre] || opts.genre}`,
-        `• Epicness: ${opts.epicness}/10 (1 = quiet/intimate, 10 = earth-shattering)`,
-        `• Realism: ${opts.realism}/10 (1 = fantastical, 10 = grounded)`,
+        `Параметры:`,
+        `• Количество шагов: ${opts.stepCount}`,
+        `• Временной охват: ${timespanLabel}`,
+        `• Жанры: ${genreList}`,
+        `• Эпичность: ${opts.epicness}/10 (1 = камерно, 10 = потрясение основ)`,
+        `• Реализм: ${opts.realism}/10 (1 = фантастика, 10 = приземлённость)`,
+        `• Бюджет токенов на весь план: примерно ${opts.tokenBudget} токенов`,
     ];
 
     if (opts.customDirection && opts.customDirection.trim()) {
-        prompt.push(``, `Additional direction from the author:`, opts.customDirection.trim());
+        prompt.push(``, `Направление от автора:`, opts.customDirection.trim());
     }
 
     prompt.push(
         ``,
-        `CRITICAL: Write ALL step descriptions ONLY in ${langName}. This is mandatory.`,
+        `СТРУКТУРА ПЛАНА:`,
         ``,
-        `Output EXACTLY ${opts.stepCount} steps in this EXACT format, one per block:`,
-        `[STEP 1]: (2-4 sentence description in ${langName})`,
-        `[STEP 2]: (2-4 sentence description in ${langName})`,
-        `...and so on up to [STEP ${opts.stepCount}]`,
+        `Последний шаг (шаг ${lastStep}) — ФИНАЛЬНАЯ ЦЕЛЬ: ключевое событие, кульминация арки. Масштаб определяется временным охватом.`,
         ``,
-        `Rules:`,
-        `- Each step is a specific narrative beat or turning point.`,
-        `- Steps flow from the current story state and build on each other.`,
-        `- Include specific character actions, events, or revelations.`,
-        `- No meta-references to this outline.`,
-        `- Output ONLY the steps. No preamble, no commentary, no markdown.]`,
+        `Шаги 1–${lastStep - 1} — события, обстоятельства, случайные происшествия, которые наполняют жизнь персонажей в этот период. Они НЕ ОБЯЗАНЫ быть последовательной цепочкой. Случайные, неожиданные, незапланированные события приветствуются — жизнь не алгоритм. Цель — разнообразие и насыщенность.`,
+        ``,
+        `АГЕНТНОСТЬ — ГЛАВНОЕ ПРАВИЛО:`,
+        ``,
+        `Шаги описывают ЧТО ПРОИСХОДИТ ВОКРУГ, а не КАК ПЕРСОНАЖИ РЕАГИРУЮТ.`,
+        `• Не предсказывай действия, слова, мысли или решения {{user}}.`,
+        `• Не предопределяй реакции, реплики или эмоции ключевых персонажей. Создавай обстоятельства, которые потребуют их реакции.`,
+        `• Можно описывать действия второстепенных персонажей, внешние события, поступающую информацию, изменения обстановки.`,
+        ``,
+        `КРИТИЧЕСКИ ВАЖНО: Все описания — ТОЛЬКО на ${langName}.`,
+        ``,
+        `Формат — РОВНО ${opts.stepCount} шагов:`,
+        `[STEP 1]: (описание ситуации на ${langName})`,
+        `...`,
+        `[STEP ${lastStep}]: (ФИНАЛЬНАЯ ЦЕЛЬ на ${langName})`,
+        ``,
+        `Только шаги. Без преамбулы, комментариев, markdown.]`,
     );
 
     return prompt.join("\n");
@@ -446,22 +461,24 @@ async function regenerateTail() {
     const langName = LANGUAGES[opts.language || "ko"] || "Korean";
 
     const prompt = [
-        `[OOC: PLOT REGENERATION REQUEST — Meta-request outside the roleplay.`,
-        `You are a plot architect. The story has progressed through these completed steps:`,
+        `[OOC: ПЕРЕГЕНЕРАЦИЯ СЮЖЕТА — мета-запрос вне ролевой игры.`,
+        `Ты — сюжетный архитектор. История прошла через эти завершённые шаги:`,
         ``,
         completedSteps,
         ``,
-        `Based on how the story has ACTUALLY developed (which may differ from the original plan),`,
-        `generate ${remainingCount} NEW steps to continue the plot from this point.`,
-        `Maintain the same genre (${GENRES[opts.genre] || "Drama"}) and tone.`,
-        `Write ALL step descriptions ONLY in ${langName}.`,
+        `На основе того, как история РЕАЛЬНО развилась (что может отличаться от плана),`,
+        `сгенерируй ${remainingCount} НОВЫХ шагов.`,
+        `Жанры: ${GENRES[opts.genre] || "Drama"}. Случайные события приветствуются.`,
+        `Последний шаг — финальная цель арки.`,
+        `Не предсказывай реакции {{user}} и ключевых персонажей — описывай ситуации.`,
+        `Все описания — ТОЛЬКО на ${langName}.`,
         ``,
-        `Output format:`,
+        `Формат:`,
         ...Array.from({ length: remainingCount }, (_, i) =>
-            `[STEP ${pd.currentIndex + i + 1}]: (description in ${langName})`
+            `[STEP ${pd.currentIndex + i + 1}]: (описание на ${langName})`
         ),
         ``,
-        `No preamble, no commentary.]`,
+        `Только шаги. Без преамбулы и комментариев.]`,
     ].join("\n");
 
     try {
@@ -573,6 +590,14 @@ function buildOptionTags(map, selected) {
 
 function showGenerateModal() {
     const s = getSettings();
+    const selectedGenres = s.defaultGenres || ["drama"];
+
+    const genreCheckboxes = Object.entries(GENRES)
+        .map(([k, v]) => {
+            const checked = selectedGenres.includes(k) ? "checked" : "";
+            return `<label><input type="checkbox" value="${k}" ${checked}> ${v}</label>`;
+        })
+        .join("");
 
     const html = `
     <div class="pd-modal-overlay" id="pd_generate_overlay">
@@ -598,8 +623,8 @@ function showGenerateModal() {
                     <select id="pd_gen_lang">${buildOptionTags(LANGUAGES, s.defaultLanguage)}</select>
                 </div>
                 <div class="pd-field">
-                    <label>Genre</label>
-                    <select id="pd_gen_genre">${buildOptionTags(GENRES, s.defaultGenre)}</select>
+                    <label>Genres</label>
+                    <div class="pd-genre-grid" id="pd_gen_genres">${genreCheckboxes}</div>
                 </div>
                 <div class="pd-field">
                     <label>Epicness</label>
@@ -613,6 +638,13 @@ function showGenerateModal() {
                     <div class="pd-range-row">
                         <input type="range" id="pd_gen_real" min="1" max="10" value="${s.defaultRealism}">
                         <span class="pd-range-val" id="pd_gen_real_val">${s.defaultRealism}</span>
+                    </div>
+                </div>
+                <div class="pd-field">
+                    <label>Token budget</label>
+                    <div class="pd-range-row">
+                        <input type="range" id="pd_gen_tokens" min="1000" max="30000" step="500" value="${s.defaultTokenBudget}">
+                        <span class="pd-range-val" id="pd_gen_tokens_val">${s.defaultTokenBudget}</span>
                     </div>
                 </div>
                 <div class="pd-field">
@@ -635,6 +667,7 @@ function showGenerateModal() {
     $("#pd_gen_count").on("input", function () { $("#pd_gen_count_val").text(this.value); });
     $("#pd_gen_epic").on("input", function () { $("#pd_gen_epic_val").text(this.value); });
     $("#pd_gen_real").on("input", function () { $("#pd_gen_real_val").text(this.value); });
+    $("#pd_gen_tokens").on("input", function () { $("#pd_gen_tokens_val").text(this.value); });
 
     const closeModal = () => $("#pd_generate_overlay").remove();
     $("#pd_gen_close, #pd_gen_cancel").on("click", closeModal);
@@ -643,23 +676,31 @@ function showGenerateModal() {
     });
 
     $("#pd_gen_submit").on("click", async function () {
+        const genres = [];
+        $("#pd_gen_genres input:checked").each(function () {
+            genres.push($(this).val());
+        });
+        if (genres.length === 0) genres.push("drama");
+
         const opts = {
-            stepCount:   parseInt($("#pd_gen_count").val()),
-            timespan:    $("#pd_gen_timespan").val(),
-            language:    $("#pd_gen_lang").val(),
-            genre:       $("#pd_gen_genre").val(),
-            epicness:    parseInt($("#pd_gen_epic").val()),
-            realism:     parseInt($("#pd_gen_real").val()),
+            stepCount:       parseInt($("#pd_gen_count").val()),
+            timespan:        $("#pd_gen_timespan").val(),
+            language:        $("#pd_gen_lang").val(),
+            genres:          genres,
+            epicness:        parseInt($("#pd_gen_epic").val()),
+            realism:         parseInt($("#pd_gen_real").val()),
+            tokenBudget:     parseInt($("#pd_gen_tokens").val()),
             customDirection: $("#pd_gen_custom").val(),
         };
 
         const s = getSettings();
-        s.defaultStepCount = opts.stepCount;
-        s.defaultTimespan  = opts.timespan;
-        s.defaultLanguage  = opts.language;
-        s.defaultGenre     = opts.genre;
-        s.defaultEpicness  = opts.epicness;
-        s.defaultRealism   = opts.realism;
+        s.defaultStepCount   = opts.stepCount;
+        s.defaultTimespan    = opts.timespan;
+        s.defaultLanguage    = opts.language;
+        s.defaultGenres      = opts.genres;
+        s.defaultEpicness    = opts.epicness;
+        s.defaultRealism     = opts.realism;
+        s.defaultTokenBudget = opts.tokenBudget;
 
         $(".pd-modal-body").html(`
             <div class="pd-loading">

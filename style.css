@@ -331,3 +331,24 @@
     color: #666;
     font-size: 0.9em;
 }
+
+/* --- Genre Checkbox Grid --- */
+.pd-genre-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 12px;
+}
+
+.pd-genre-grid label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.85em;
+    color: #ccc;
+    cursor: pointer;
+    padding: 2px 0;
+}
+
+.pd-genre-grid input[type="checkbox"] {
+    accent-color: #e88c3a;
+}

@@ -61,36 +61,74 @@ function patchFromContext() {
     return true;
 }
 
-// ── Plot Data (module cache + chat_metadata) ─────────────────
+// ── Plot Data — triple storage: extension_settings (persistent) + chat_metadata + memory cache
 
 let _plotCache = {};
 function _chatId() { const c = getContext(); return c?.chatId || "default"; }
 
+function _ensurePlotsObj() {
+    if (!extension_settings[EXT_NAME]) extension_settings[EXT_NAME] = { ...DEFAULT_SETTINGS };
+    if (!extension_settings[EXT_NAME].plots) extension_settings[EXT_NAME].plots = {};
+    return extension_settings[EXT_NAME].plots;
+}
+
 function getPlotData() {
     const id = _chatId();
+    // 1. Memory cache (fastest)
     if (_plotCache[id]) return _plotCache[id];
-    const ctx = getContext();
-    const s = ctx?.chat_metadata?.plot_director;
-    if (s) { _plotCache[id] = s; return s; }
+    // 2. extension_settings (persistent across reloads)
+    const plots = _ensurePlotsObj();
+    if (plots[id]) { _plotCache[id] = plots[id]; return plots[id]; }
+    // 3. chat_metadata (fallback)
+    try {
+        const ctx = getContext();
+        const s = ctx?.chat_metadata?.plot_director;
+        if (s) { _plotCache[id] = s; plots[id] = s; return s; }
+    } catch(e) {}
     return null;
 }
+
 function savePlotData(data) {
-    _plotCache[_chatId()] = data;
+    const id = _chatId();
+    // Write to all three layers
+    _plotCache[id] = data;
+    _ensurePlotsObj()[id] = data;
     try {
         const ctx = getContext();
         if (!ctx.chat_metadata) ctx.chat_metadata = {};
         ctx.chat_metadata.plot_director = data;
-        if (saveChatDebounced) saveChatDebounced();
-    } catch(e) { console.warn("[PD] save err", e); }
+    } catch(e) {}
+    // Try every save method available
+    _persistSave();
+    console.log("[PD] Saved for chat " + id + ", steps: " + (data?.steps?.length || 0));
 }
+
 function clearPlotData() {
-    delete _plotCache[_chatId()];
+    const id = _chatId();
+    delete _plotCache[id];
+    const plots = _ensurePlotsObj();
+    delete plots[id];
     try {
         const ctx = getContext();
         if (ctx.chat_metadata) delete ctx.chat_metadata.plot_director;
-        if (saveChatDebounced) saveChatDebounced();
     } catch(e) {}
     if (setExtensionPrompt) setExtensionPrompt(INJECTION_ID, "", 1, 1, true, "system");
+    _persistSave();
+}
+
+function _persistSave() {
+    // Try multiple save methods — at least one should work
+    try { if (saveChatDebounced) saveChatDebounced(); } catch(e) {}
+    try {
+        const ctx = getContext();
+        if (ctx.saveChat) ctx.saveChat();
+    } catch(e) {}
+    // extension_settings is auto-saved by ST on settings change,
+    // but let's trigger it explicitly via the context if possible
+    try {
+        const ctx = getContext();
+        if (ctx.saveSettings) ctx.saveSettings();
+    } catch(e) {}
 }
 function newPlotData(steps, settings) {
     return { steps: steps.map(t => ({ text: t, completed: false })), currentIndex: 0, lastAdvancedMsg: -1, genSettings: settings };
@@ -226,11 +264,11 @@ function onMessageSwiped(messageIndex) {
     } else { onMessageReceived(idx); }
 }
 function onChatChanged() {
+    // Force reload into cache from persistent storage
     const id = _chatId();
-    try { const ctx = getContext(); const st = ctx?.chat_metadata?.plot_director;
-        if (st) _plotCache[id] = st; else delete _plotCache[id]; } catch(e) {}
-    const pd = getPlotData();
-    if (pd && pd.steps.length > 0) injectCurrentStep();
+    delete _plotCache[id]; // clear stale cache, force re-read
+    const pd = getPlotData(); // will check extension_settings → chat_metadata → null
+    if (pd && pd.steps && pd.steps.length > 0) injectCurrentStep();
     else if (setExtensionPrompt) setExtensionPrompt(INJECTION_ID, "", 1, 1, true, "system");
     updatePanel();
 }

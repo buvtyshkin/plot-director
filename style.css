@@ -352,3 +352,65 @@
 .pd-genre-grid input[type="checkbox"] {
     accent-color: #e88c3a;
 }
+
+/* --- Tabs --- */
+.pd-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #3a3b4e;
+}
+.pd-tab {
+    padding: 6px 16px;
+    font-size: 0.9em;
+    cursor: pointer;
+    opacity: 0.5;
+    border-bottom: 2px solid transparent;
+    transition: opacity 0.15s;
+}
+.pd-tab:hover { opacity: 0.8; }
+.pd-tab.active { opacity: 1; border-bottom-color: #e88c3a; }
+
+/* --- Raw Text View --- */
+.pd-raw-textarea {
+    width: 100%;
+    min-height: 300px;
+    padding: 10px;
+    border: 1px solid #3a3b4e;
+    border-radius: 4px;
+    background: #12132a;
+    color: #ccc;
+    font-family: monospace;
+    font-size: 0.85em;
+    line-height: 1.5;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+/* --- Token Input --- */
+.pd-token-input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #3a3b4e;
+    border-radius: 4px;
+    background: #12132a;
+    color: #ddd;
+    font-family: inherit;
+    font-size: 0.9em;
+    box-sizing: border-box;
+}
+
+/* --- API Input Fields --- */
+.pd-api-input {
+    width: 100%;
+    padding: 4px 6px;
+    margin-bottom: 3px;
+    border: 1px solid #3a3b4e;
+    border-radius: 3px;
+    background: #12132a;
+    color: #ccc;
+    font-family: inherit;
+    font-size: 0.8em;
+    box-sizing: border-box;
+}
+.pd-api-input::placeholder { color: #555; }

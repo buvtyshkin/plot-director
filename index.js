@@ -1,20 +1,22 @@
 // ============================================================
 //  Plot Director — SillyTavern Extension v1.0
 //  A plot controller with step-by-step narrative injection.
+//  Uses import * for maximum compatibility across ST versions.
 // ============================================================
 
-import {
-    extension_settings,
-    getContext,
-    setExtensionPrompt,
-} from "../../../extensions.js";
+import * as ExtModule from "../../../extensions.js";
+import * as ScriptModule from "../../../../script.js";
 
-import {
-    eventSource,
-    event_types,
-    generateQuietPrompt,
-    saveChatDebounced,
-} from "../../../../script.js";
+// ── Extract what's available from modules ────────────────────
+const extension_settings = ExtModule.extension_settings;
+const getContext = ExtModule.getContext;
+
+// These may or may not exist as direct exports — we'll patch from context
+let setExtensionPrompt = ExtModule.setExtensionPrompt;
+let eventSource = ScriptModule.eventSource;
+let event_types = ScriptModule.event_types;
+let generateQuietPrompt = ScriptModule.generateQuietPrompt;
+let saveChatDebounced = ScriptModule.saveChatDebounced;
 
 // ── Constants ────────────────────────────────────────────────
 
@@ -67,8 +69,36 @@ const DEFAULT_SETTINGS = {
     defaultGenre: "drama",
 };
 
+// ── Patch missing functions from context ─────────────────────
+
+function patchFromContext() {
+    if (!getContext) {
+        console.error("[Plot Director] getContext not available — extension cannot function.");
+        return false;
+    }
+    const ctx = getContext();
+    if (!setExtensionPrompt) setExtensionPrompt = ctx.setExtensionPrompt;
+    if (!eventSource) eventSource = ctx.eventSource;
+    if (!event_types) event_types = ctx.event_types;
+    if (!generateQuietPrompt) generateQuietPrompt = ctx.generateQuietPrompt;
+    if (!saveChatDebounced) saveChatDebounced = ctx.saveChatDebounced || ctx.saveChat;
+
+    const missing = [];
+    if (!setExtensionPrompt) missing.push("setExtensionPrompt");
+    if (!eventSource) missing.push("eventSource");
+    if (!event_types) missing.push("event_types");
+    if (!generateQuietPrompt) missing.push("generateQuietPrompt");
+    if (!saveChatDebounced) missing.push("saveChatDebounced");
+
+    if (missing.length) {
+        console.warn("[Plot Director] Still missing after patching:", missing.join(", "));
+    } else {
+        console.log("[Plot Director] All functions resolved.");
+    }
+    return true;
+}
+
 // ── Plot Data Helpers ────────────────────────────────────────
-// Per-chat data lives in chat_metadata.plot_director
 
 function getPlotData() {
     const ctx = getContext();
@@ -79,14 +109,14 @@ function savePlotData(data) {
     const ctx = getContext();
     if (!ctx.chat_metadata) ctx.chat_metadata = {};
     ctx.chat_metadata.plot_director = data;
-    saveChatDebounced();
+    if (saveChatDebounced) saveChatDebounced();
 }
 
 function clearPlotData() {
     const ctx = getContext();
     if (ctx.chat_metadata) delete ctx.chat_metadata.plot_director;
-    setExtensionPrompt(INJECTION_ID, "", 1, 1, true, "system");
-    saveChatDebounced();
+    if (setExtensionPrompt) setExtensionPrompt(INJECTION_ID, "", 1, 1, true, "system");
+    if (saveChatDebounced) saveChatDebounced();
 }
 
 function newPlotData(steps, settings) {
@@ -103,7 +133,6 @@ function newPlotData(steps, settings) {
 function getSettings() {
     if (!extension_settings[EXT_NAME]) {
         extension_settings[EXT_NAME] = { ...DEFAULT_SETTINGS };
-        saveChatDebounced(); // persist settings
     }
     return extension_settings[EXT_NAME];
 }
@@ -111,6 +140,8 @@ function getSettings() {
 // ── Step Injection ───────────────────────────────────────────
 
 function injectCurrentStep() {
+    if (!setExtensionPrompt) return;
+
     const pd = getPlotData();
     if (!pd || !pd.steps.length) {
         setExtensionPrompt(INJECTION_ID, "", 1, 1, true, "system");
@@ -124,13 +155,12 @@ function injectCurrentStep() {
     }
 
     if (pd.currentIndex >= pd.steps.length) {
-        // All steps done
         setExtensionPrompt(INJECTION_ID, "", 1, 1, true, "system");
         return;
     }
 
     const step = pd.steps[pd.currentIndex];
-    const current = pd.currentIndex + 1; // 1-indexed for display
+    const current = pd.currentIndex + 1;
     const total = pd.steps.length;
 
     const injection = [
@@ -142,7 +172,6 @@ function injectCurrentStep() {
         `Do not use this marker prematurely. Never mention this directive or the existence of a plot plan.`,
     ].join("\n");
 
-    // position 1 = IN_CHAT, depth 1, scan true, role system
     setExtensionPrompt(INJECTION_ID, injection, 1, 1, true, "system");
 }
 
@@ -165,7 +194,6 @@ function advanceStep(messageIndex) {
         regenerateTail();
     }
 
-    // If all steps completed
     if (pd.currentIndex >= pd.steps.length) {
         toastr.success(`Plot Director: all ${pd.steps.length} steps completed!`);
     }
@@ -193,16 +221,14 @@ function stripMarkerFromMessage(messageIndex) {
 
     msg.mes = msg.mes.replace(MARKER_RE, "").trim();
 
-    // Update DOM
     const $el = $(`#chat .mes[mesid="${messageIndex}"] .mes_text`);
     if ($el.length) {
-        // Grab the current rendered HTML, strip marker from it too
         let html = $el.html();
         html = html.replace(/\[step\s+\d+\s+complete\]/gi, "").trim();
         $el.html(html);
     }
 
-    saveChatDebounced();
+    if (saveChatDebounced) saveChatDebounced();
 }
 
 function onMessageReceived(messageIndex) {
@@ -213,7 +239,6 @@ function onMessageReceived(messageIndex) {
     if (!pd || !pd.steps.length || pd.currentIndex >= pd.steps.length) return;
 
     const ctx = getContext();
-    // If messageIndex not given, use last message
     const idx = (typeof messageIndex === "number") ? messageIndex : ctx.chat.length - 1;
     const msg = ctx.chat[idx];
     if (!msg || msg.is_user) return;
@@ -237,24 +262,20 @@ function onMessageSwiped(messageIndex) {
     const ctx = getContext();
     const idx = (typeof messageIndex === "number") ? messageIndex : ctx.chat.length - 1;
 
-    // If the swiped message was the one that caused the last advance
     if (pd.lastAdvancedMsg === idx) {
         const msg = ctx.chat[idx];
         if (!msg) return;
 
-        const expectedStep = pd.currentIndex; // already advanced, so current is one ahead
+        const expectedStep = pd.currentIndex;
         const re = new RegExp(`\\[step\\s+${expectedStep}\\s+complete\\]`, "gi");
 
         if (!re.test(msg.mes)) {
-            // New swipe doesn't have the marker — roll back
             rollbackStep();
             toastr.info("Plot Director: step rolled back (marker absent in swipe).");
         } else {
-            // Swipe still has the marker — strip it
             stripMarkerFromMessage(idx);
         }
     } else {
-        // Check if the new content has our current step marker
         onMessageReceived(idx);
     }
 }
@@ -263,7 +284,7 @@ function onChatChanged() {
     const pd = getPlotData();
     if (pd && pd.steps.length > 0) {
         injectCurrentStep();
-    } else {
+    } else if (setExtensionPrompt) {
         setExtensionPrompt(INJECTION_ID, "", 1, 1, true, "system");
     }
     updatePanel();
@@ -324,6 +345,11 @@ function parseSteps(text) {
 }
 
 async function generatePlot(opts) {
+    if (!generateQuietPrompt) {
+        toastr.error("Plot Director: generateQuietPrompt not available.");
+        return null;
+    }
+
     const prompt = buildGenerationPrompt(opts);
     try {
         const result = await generateQuietPrompt(prompt, false);
@@ -331,7 +357,6 @@ async function generatePlot(opts) {
 
         const steps = parseSteps(result);
         if (steps.length === 0) {
-            // Fallback: try splitting by numbered lines
             const lines = result.split(/\n/).filter(l => l.trim());
             if (lines.length > 0) {
                 lines.forEach(l => {
@@ -362,6 +387,11 @@ async function generatePlot(opts) {
 async function regenerateTail() {
     const pd = getPlotData();
     if (!pd || pd.currentIndex >= pd.steps.length) return;
+
+    if (!generateQuietPrompt) {
+        toastr.error("Plot Director: generateQuietPrompt not available.");
+        return;
+    }
 
     const completedSteps = pd.steps
         .slice(0, pd.currentIndex)
@@ -400,7 +430,6 @@ async function regenerateTail() {
             throw new Error("Could not parse regenerated steps");
         }
 
-        // Replace remaining steps
         const kept = pd.steps.slice(0, pd.currentIndex);
         const fresh = newSteps.map(text => ({ text, completed: false }));
         pd.steps = [...kept, ...fresh];
@@ -560,19 +589,16 @@ function showGenerateModal() {
 
     $("body").append(html);
 
-    // Live range display
     $("#pd_gen_count").on("input", function () { $("#pd_gen_count_val").text(this.value); });
     $("#pd_gen_epic").on("input", function () { $("#pd_gen_epic_val").text(this.value); });
     $("#pd_gen_real").on("input", function () { $("#pd_gen_real_val").text(this.value); });
 
-    // Close
     const closeModal = () => $("#pd_generate_overlay").remove();
     $("#pd_gen_close, #pd_gen_cancel").on("click", closeModal);
     $("#pd_generate_overlay").on("click", function (e) {
         if (e.target === this) closeModal();
     });
 
-    // Submit
     $("#pd_gen_submit").on("click", async function () {
         const opts = {
             stepCount:   parseInt($("#pd_gen_count").val()),
@@ -584,7 +610,6 @@ function showGenerateModal() {
             customDirection: $("#pd_gen_custom").val(),
         };
 
-        // Save as new defaults
         const s = getSettings();
         s.defaultStepCount = opts.stepCount;
         s.defaultTimespan  = opts.timespan;
@@ -592,9 +617,7 @@ function showGenerateModal() {
         s.defaultGenre     = opts.genre;
         s.defaultEpicness  = opts.epicness;
         s.defaultRealism   = opts.realism;
-        saveChatDebounced(); // persist settings
 
-        // Show loading state
         $(".pd-modal-body").html(`
             <div class="pd-loading">
                 <div class="pd-spinner"></div>
@@ -608,7 +631,6 @@ function showGenerateModal() {
         if (result) {
             closeModal();
         } else {
-            // Restore form on failure
             closeModal();
             showGenerateModal();
         }
@@ -629,23 +651,20 @@ function showStepsModal() {
     const isForeignLang = !["en", "ru"].includes(lang);
 
     const stepsHTML = pd.steps.map((step, i) => {
-        let status, dotClass;
+        let status;
         if (step.completed) {
             status = "completed";
-            dotClass = "completed";
         } else if (i === pd.currentIndex) {
             status = "active";
-            dotClass = "active";
         } else {
             status = "pending";
-            dotClass = "pending";
         }
 
         const spoilerClass = isForeignLang ? "" : "spoiler-blur";
 
         return `
         <li class="pd-step-item ${status}" data-step-index="${i}">
-            <div class="pd-step-badge ${dotClass}">${i + 1}</div>
+            <div class="pd-step-badge ${status}">${i + 1}</div>
             <div class="pd-step-content">
                 <div class="pd-step-text ${spoilerClass}" data-step-index="${i}">${escapeHtml(step.text)}</div>
             </div>
@@ -664,7 +683,7 @@ function showStepsModal() {
                 <button class="pd-modal-close" id="pd_steps_close">&times;</button>
             </div>
             <div class="pd-modal-body">
-                ${!isForeignLang ? '<p class="pd-note">Click blurred text to reveal/hide. Steps in your language are blurred to avoid spoilers.</p>' : ""}
+                ${!isForeignLang ? '<p class="pd-note">Click blurred text to reveal/hide.</p>' : ""}
                 <ul class="pd-step-list">${stepsHTML}</ul>
             </div>
             <div class="pd-modal-footer">
@@ -678,35 +697,28 @@ function showStepsModal() {
 
     $("body").append(html);
 
-    // Close
     const closeModal = () => $("#pd_steps_overlay").remove();
     $("#pd_steps_close, #pd_steps_done").on("click", closeModal);
     $("#pd_steps_overlay").on("click", function (e) {
         if (e.target === this) closeModal();
     });
 
-    // Spoiler toggle per-step
     $(".pd-step-text.spoiler-blur").on("click", function () {
         $(this).toggleClass("revealed");
     });
 
-    // Toggle all spoilers
     $("#pd_steps_reveal_all").on("click", function () {
         const $blurred = $(".pd-step-text.spoiler-blur");
         const anyHidden = $blurred.not(".revealed").length > 0;
         $blurred.toggleClass("revealed", anyHidden);
     });
 
-    // Edit step
     $(".pd-step-edit-btn").on("click", function () {
         const idx = parseInt($(this).data("step-index"));
         const $content = $(this).closest(".pd-step-item").find(".pd-step-content");
         const $text = $content.find(".pd-step-text");
 
-        // Check if already editing
-        if ($content.find(".pd-step-edit-area").length) {
-            return;
-        }
+        if ($content.find(".pd-step-edit-area").length) return;
 
         const currentText = pd.steps[idx].text;
         $text.hide();
@@ -735,13 +747,11 @@ function showStepsModal() {
         });
     });
 
-    // Go-to step
     $(".pd-step-goto-btn").on("click", function () {
         const idx = parseInt($(this).data("step-index"));
         const pd2 = getPlotData();
         if (!pd2) return;
 
-        // Mark all steps before idx as completed, all from idx as not completed
         pd2.steps.forEach((s, i) => { s.completed = i < idx; });
         pd2.currentIndex = idx;
         pd2.lastAdvancedMsg = -1;
@@ -767,10 +777,13 @@ function escapeHtml(str) {
 // ── Initialization ───────────────────────────────────────────
 
 jQuery(async () => {
+    // Patch missing functions from context
+    if (!patchFromContext()) return;
+
     // Ensure settings exist
     getSettings();
 
-    // Inject panel into Extensions sidebar
+    // Inject panel
     const $container = $("#extensions_settings2");
     $container.append(buildPanelHTML());
 
@@ -806,7 +819,7 @@ jQuery(async () => {
             return;
         }
         rollbackStep();
-        toastr.info(`Plot Director: rolled back to step ${pd.currentIndex + 1}.`);
+        toastr.info(`Rolled back to step ${getPlotData().currentIndex + 1}.`);
     });
 
     $("#pd_btn_next").on("click", () => {
@@ -819,7 +832,7 @@ jQuery(async () => {
             toastr.warning("All steps completed.");
             return;
         }
-        advanceStep(-1); // Manual advance, no message association
+        advanceStep(-1);
     });
 
     $("#pd_btn_clear").on("click", () => {
@@ -829,27 +842,29 @@ jQuery(async () => {
         toastr.info("Plot Director: plot cleared.");
     });
 
-    // Toggle handlers
     $("#pd_toggle_enabled").on("change", function () {
         const s = getSettings();
         s.enabled = this.checked;
-        saveChatDebounced(); // persist settings
         injectCurrentStep();
     });
 
     $("#pd_toggle_autoregen").on("change", function () {
         const s = getSettings();
         s.autoRegenTail = this.checked;
-        saveChatDebounced(); // persist settings
     });
 
     // Event listeners
-    eventSource.on(event_types.MESSAGE_RECEIVED, (idx) => onMessageReceived(idx));
-    eventSource.on(event_types.MESSAGE_SWIPED, (idx) => onMessageSwiped(idx));
-    eventSource.on(event_types.CHAT_CHANGED, () => onChatChanged());
+    if (eventSource && event_types) {
+        eventSource.on(event_types.MESSAGE_RECEIVED, (idx) => onMessageReceived(idx));
+        eventSource.on(event_types.MESSAGE_SWIPED, (idx) => onMessageSwiped(idx));
+        eventSource.on(event_types.CHAT_CHANGED, () => onChatChanged());
+        console.log("[Plot Director] Event listeners registered.");
+    } else {
+        console.warn("[Plot Director] eventSource/event_types not available — auto-detection disabled.");
+    }
 
     // Initial state
     onChatChanged();
 
-    console.log("[Plot Director] Extension loaded.");
+    console.log("[Plot Director] Extension loaded successfully.");
 });

@@ -39,7 +39,7 @@ const DEFAULT_SETTINGS = {
     defaultStepCount: 8, defaultTimespan: "month", defaultLanguage: "ko",
     defaultEpicness: 5, defaultRealism: 5, defaultGenres: ["drama"],
     defaultTokenBudget: 0,
-    apiUrl: "", apiKey: "", apiModel: "",
+    genProfile: "",
 };
 
 // ── Patch missing functions from context ─────────────────────
@@ -172,30 +172,47 @@ function gatherContextSummary() {
     return parts.join("\n\n---\n\n");
 }
 
-// ── Direct API Call ──────────────────────────────────────────
+// ── Connection Profile Support ───────────────────────────────
+// Uses ST's built-in Connection Profiles: we list existing profiles,
+// and for generation temporarily switch to the chosen one via /profile,
+// generate, then switch back.
 
-async function generateViaDirectAPI(prompt) {
-    const s = getSettings();
-    if (!s.apiUrl || !s.apiKey || !s.apiModel) throw new Error("Custom API not configured.");
-    const context = gatherContextSummary();
-    const resp = await fetch(s.apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + s.apiKey },
-        body: JSON.stringify({
-            model: s.apiModel,
-            messages: [
-                { role: "system", content: context },
-                { role: "user", content: prompt },
-            ],
-            max_tokens: 8192, temperature: 1.0,
-        }),
-    });
-    if (!resp.ok) { const e = await resp.text().catch(()=>""); throw new Error("API " + resp.status + ": " + e.slice(0,200)); }
-    const data = await resp.json();
-    return data.choices?.[0]?.message?.content || "";
+function getConnectionProfiles() {
+    try {
+        const ctx = getContext();
+        const cp = ctx.extensionSettings?.connectionManager;
+        if (cp && Array.isArray(cp.profiles)) {
+            return cp.profiles.map(p => p.name).filter(Boolean);
+        }
+    } catch(e) { console.warn("[PD] Cannot read connection profiles:", e); }
+    return [];
 }
 
-function useCustomAPI() { const s = getSettings(); return !!(s.apiUrl && s.apiKey && s.apiModel); }
+function getCurrentProfileName() {
+    try {
+        const ctx = getContext();
+        const cp = ctx.extensionSettings?.connectionManager;
+        if (cp && cp.selectedProfile && Array.isArray(cp.profiles)) {
+            const found = cp.profiles.find(p => p.id === cp.selectedProfile);
+            return found?.name || null;
+        }
+    } catch(e) {}
+    return null;
+}
+
+async function switchProfile(name) {
+    const ctx = getContext();
+    if (ctx.executeSlashCommandsWithOptions) {
+        await ctx.executeSlashCommandsWithOptions(`/profile await=true ${name}`);
+    } else if (ctx.executeSlashCommands) {
+        await ctx.executeSlashCommands(`/profile ${name}`);
+        await new Promise(r => setTimeout(r, 1500)); // give it time to connect
+    } else {
+        throw new Error("Slash command execution not available");
+    }
+}
+
+function useCustomProfile() { const s = getSettings(); return !!(s.genProfile && s.genProfile !== ""); }
 
 // ── Step Injection (multiple methods) ─────────────────────────
 
@@ -351,16 +368,44 @@ function parseSteps(text) {
     return steps;
 }
 
+// Shared generation with optional profile switch: switch → generate → switch back
+async function generateWithProfile(prompt) {
+    if (!generateQuietPrompt) throw new Error("generateQuietPrompt not available");
+    const s = getSettings();
+
+    if (!useCustomProfile()) {
+        return await generateQuietPrompt(prompt, false);
+    }
+
+    const originalProfile = getCurrentProfileName();
+    const targetProfile = s.genProfile;
+
+    if (!originalProfile) {
+        console.warn("[PD] No current profile detected — generating with target profile without switching back.");
+    }
+
+    try {
+        console.log("[PD] Switching profile: " + originalProfile + " → " + targetProfile);
+        await switchProfile(targetProfile);
+        const result = await generateQuietPrompt(prompt, false);
+        return result;
+    } finally {
+        if (originalProfile && originalProfile !== targetProfile) {
+            try {
+                console.log("[PD] Switching profile back to: " + originalProfile);
+                await switchProfile(originalProfile);
+            } catch(e) {
+                console.error("[PD] Failed to switch back:", e);
+                toastr.warning("Plot Director: failed to switch back to " + originalProfile + " — check your connection profile!");
+            }
+        }
+    }
+}
+
 async function generatePlot(opts) {
     const prompt = buildGenerationPrompt(opts);
     try {
-        let result;
-        if (useCustomAPI()) {
-            result = await generateViaDirectAPI(prompt);
-        } else {
-            if (!generateQuietPrompt) throw new Error("generateQuietPrompt not available");
-            result = await generateQuietPrompt(prompt, false);
-        }
+        const result = await generateWithProfile(prompt);
         if (!result) throw new Error("Empty response");
         const steps = parseSteps(result);
         if (steps.length === 0) {
@@ -394,9 +439,7 @@ async function regenerateTail() {
         "", "Только шаги.]",
     ].join("\n");
     try {
-        let result;
-        if (useCustomAPI()) result = await generateViaDirectAPI(prompt);
-        else { if (!generateQuietPrompt) throw new Error("No generateQuietPrompt"); result = await generateQuietPrompt(prompt, false); }
+        const result = await generateWithProfile(prompt);
         if (!result) throw new Error("Empty");
         const ns = parseSteps(result); if (ns.length===0) throw new Error("Parse failed");
         pd.steps = [...pd.steps.slice(0,pd.currentIndex), ...ns.map(t=>({text:t,completed:false}))];
@@ -438,11 +481,11 @@ function buildPanelHTML() {
                     <input type="checkbox" id="pd_toggle_autoregen"><label for="pd_toggle_autoregen">Auto-regenerate tail</label>
                 </div>
                 <hr class="pd-divider">
-                <div style="font-size:0.8em;opacity:0.6;margin-bottom:4px;">Custom API for generation</div>
-                <input type="text" id="pd_api_url" class="pd-api-input" placeholder="URL (e.g. https://api.nanogpt.net/v1/chat/completions)">
-                <input type="password" id="pd_api_key" class="pd-api-input" placeholder="API Key">
-                <input type="text" id="pd_api_model" class="pd-api-input" placeholder="Model (e.g. deepseek-chat)">
-                <p class="pd-note">Leave empty → uses current ST connection.</p>
+                <div style="font-size:0.8em;opacity:0.6;margin-bottom:4px;">Generation profile</div>
+                <select id="pd_gen_profile" class="pd-profile-select">
+                    <option value="">— Current connection —</option>
+                </select>
+                <p class="pd-note">Plot generation will temporarily switch to this profile, then switch back.</p>
             </div>
         </div>
     </div>`;
@@ -479,7 +522,7 @@ function showGenerateModal() {
             <div class="pd-field"><label>Realism</label><div class="pd-range-row"><input type="range" id="pd_gen_real" min="1" max="10" value="${s.defaultRealism}"><span class="pd-range-val" id="pd_gen_real_val">${s.defaultRealism}</span></div></div>
             <div class="pd-field"><label>Token budget (0 = no limit)</label><input type="number" id="pd_gen_tokens" min="0" max="30000" step="500" value="${s.defaultTokenBudget}" class="pd-token-input"></div>
             <div class="pd-field"><label>Custom direction (optional)</label><textarea id="pd_gen_custom" placeholder="Направление сюжета, фокус на персонажах, конкретные события..."></textarea></div>
-            <p class="pd-note">${useCustomAPI() ? "⚡ Using custom API: "+s.apiModel : "Uses current ST connection + full context."}</p>
+            <p class="pd-note">${useCustomProfile() ? "⚡ Generation profile: "+s.genProfile : "Uses current ST connection + full context."}</p>
         </div>
         <div class="pd-modal-footer">
             <div class="menu_button" id="pd_gen_cancel">Cancel</div>
@@ -632,16 +675,21 @@ jQuery(async () => {
     // Panel
     $("#extensions_settings2").append(buildPanelHTML());
 
-    // Load saved API fields
-    const s = getSettings();
-    $("#pd_api_url").val(s.apiUrl||"");
-    $("#pd_api_key").val(s.apiKey||"");
-    $("#pd_api_model").val(s.apiModel||"");
+    // Populate profile dropdown
+    function refreshProfileDropdown() {
+        const $sel = $("#pd_gen_profile");
+        const cur = getSettings().genProfile || "";
+        const profiles = getConnectionProfiles();
+        $sel.empty().append('<option value="">— Current connection —</option>');
+        profiles.forEach(name => {
+            $sel.append('<option value="' + name.replace(/"/g, "&quot;") + '"' + (name === cur ? " selected" : "") + '>' + name + '</option>');
+        });
+    }
+    refreshProfileDropdown();
 
-    // API field handlers
-    $("#pd_api_url").on("change",function(){getSettings().apiUrl=$(this).val().trim()});
-    $("#pd_api_key").on("change",function(){getSettings().apiKey=$(this).val().trim()});
-    $("#pd_api_model").on("change",function(){getSettings().apiModel=$(this).val().trim()});
+    $("#pd_gen_profile")
+        .on("focus", refreshProfileDropdown) // re-read list on open
+        .on("change", function(){ getSettings().genProfile = $(this).val(); });
 
     // Add to extensions dropdown menu (the right wand icon)
     const $menuItem = $('<div id="pd_menu_item" class="list-group-item flex-container flexGap5"><div class="fa-solid fa-clapperboard extensionsMenuExtensionButton"></div>Plot Director</div>');

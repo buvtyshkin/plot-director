@@ -414,3 +414,105 @@
     box-sizing: border-box;
 }
 .pd-api-input::placeholder { color: #555; }
+
+/* --- Profile Select --- */
+.pd-profile-select {
+    width: 100%;
+    padding: 5px 6px;
+    border: 1px solid #3a3b4e;
+    border-radius: 3px;
+    background: #12132a;
+    color: #ccc;
+    font-family: inherit;
+    font-size: 0.85em;
+    box-sizing: border-box;
+}
+.pd-profile-select option { background: #12132a; color: #ccc; }
+
+/* --- Mobile Fixes --- */
+@media (max-width: 768px), (max-height: 600px) {
+    .pd-modal-overlay {
+        align-items: flex-start;
+        padding: 8px;
+        box-sizing: border-box;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .pd-modal {
+        width: 100%;
+        max-width: 100%;
+        max-height: calc(100vh - 16px);
+        max-height: calc(100dvh - 16px); /* dynamic viewport on mobile */
+        margin: 0;
+        border-radius: 6px;
+    }
+    .pd-modal-header {
+        padding: 10px 12px;
+        font-size: 1em;
+        position: sticky;
+        top: 0;
+        background: #1a1b2e;
+        z-index: 2;
+        border-radius: 6px 6px 0 0;
+    }
+    .pd-modal-body {
+        padding: 12px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .pd-modal-footer {
+        padding: 10px 12px;
+        position: sticky;
+        bottom: 0;
+        background: #1a1b2e;
+        z-index: 2;
+        border-radius: 0 0 6px 6px;
+        flex-wrap: wrap;
+    }
+    .pd-modal-footer .menu_button {
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+    }
+    /* Larger touch targets */
+    .pd-step-actions button {
+        padding: 6px 10px;
+        font-size: 0.95em;
+        min-width: 36px;
+        min-height: 36px;
+    }
+    .pd-modal-close {
+        padding: 8px 12px;
+        font-size: 1.5em;
+    }
+    .pd-genre-grid {
+        grid-template-columns: 1fr;
+    }
+    .pd-genre-grid label {
+        padding: 6px 0;
+        min-height: 32px;
+    }
+    .pd-range-row input[type="range"] {
+        min-height: 32px;
+    }
+    .pd-raw-textarea {
+        min-height: 200px;
+        font-size: 16px; /* prevents iOS zoom on focus */
+    }
+    .pd-field select,
+    .pd-field textarea,
+    .pd-field input[type="text"],
+    .pd-field input[type="number"],
+    .pd-token-input {
+        font-size: 16px; /* prevents iOS zoom on focus */
+        min-height: 40px;
+    }
+    .pd-tab {
+        padding: 10px 16px;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+    }
+}

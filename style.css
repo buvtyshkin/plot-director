@@ -429,85 +429,94 @@
 }
 .pd-profile-select option { background: #12132a; color: #ccc; }
 
-/* --- Mobile Fixes --- */
-@media (max-width: 768px), (max-height: 600px) {
+/* --- Mobile: fullscreen modal approach --- */
+@media (max-width: 768px) {
     .pd-modal-overlay {
-        align-items: flex-start;
-        padding: 8px;
-        box-sizing: border-box;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
+        /* Fullscreen fixed overlay, no flex centering games */
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+        z-index: 99999 !important;
+        background: #1a1b2e !important;
     }
     .pd-modal {
-        width: 100%;
-        max-width: 100%;
-        max-height: calc(100vh - 16px);
-        max-height: calc(100dvh - 16px); /* dynamic viewport on mobile */
-        margin: 0;
-        border-radius: 6px;
+        /* Modal fills the entire overlay */
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        margin: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-shadow: none !important;
     }
     .pd-modal-header {
-        padding: 10px 12px;
+        flex: 0 0 auto;
+        padding: 12px;
         font-size: 1em;
-        position: sticky;
-        top: 0;
-        background: #1a1b2e;
-        z-index: 2;
-        border-radius: 6px 6px 0 0;
     }
     .pd-modal-body {
-        padding: 12px;
+        flex: 1 1 auto;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
+        padding: 12px;
+        min-height: 0; /* critical for flex scroll */
     }
     .pd-modal-footer {
+        flex: 0 0 auto;
         padding: 10px 12px;
-        position: sticky;
-        bottom: 0;
-        background: #1a1b2e;
-        z-index: 2;
-        border-radius: 0 0 6px 6px;
         flex-wrap: wrap;
+        gap: 6px;
     }
     .pd-modal-footer .menu_button {
-        min-height: 40px;
+        min-height: 42px;
         display: flex;
         align-items: center;
         justify-content: center;
         flex: 1;
     }
-    /* Larger touch targets */
-    .pd-step-actions button {
-        padding: 6px 10px;
-        font-size: 0.95em;
-        min-width: 36px;
-        min-height: 36px;
-    }
     .pd-modal-close {
-        padding: 8px 12px;
+        padding: 8px 14px;
         font-size: 1.5em;
     }
+    .pd-step-actions button {
+        padding: 6px 10px;
+        min-width: 38px;
+        min-height: 38px;
+    }
     .pd-genre-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
     }
     .pd-genre-grid label {
         padding: 6px 0;
-        min-height: 32px;
-    }
-    .pd-range-row input[type="range"] {
-        min-height: 32px;
-    }
-    .pd-raw-textarea {
-        min-height: 200px;
-        font-size: 16px; /* prevents iOS zoom on focus */
+        min-height: 30px;
     }
     .pd-field select,
     .pd-field textarea,
     .pd-field input[type="text"],
     .pd-field input[type="number"],
     .pd-token-input {
-        font-size: 16px; /* prevents iOS zoom on focus */
+        font-size: 16px;
         min-height: 40px;
+    }
+    .pd-raw-textarea {
+        min-height: 200px;
+        font-size: 16px;
     }
     .pd-tab {
         padding: 10px 16px;

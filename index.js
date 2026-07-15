@@ -505,161 +505,192 @@ function updatePanel() {
 
 function optTags(map,sel) { return Object.entries(map).map(([k,v])=>'<option value="'+k+'"'+(k===sel?' selected':'')+'>'+v+'</option>').join(""); }
 
-function showGenerateModal() {
+function getPopupClass() {
+    try {
+        const ctx = getContext();
+        if (ctx.Popup) return { Popup: ctx.Popup, POPUP_TYPE: ctx.POPUP_TYPE };
+    } catch(e) {}
+    try {
+        if (typeof SillyTavern !== "undefined" && SillyTavern.getContext) {
+            const c = SillyTavern.getContext();
+            if (c.Popup) return { Popup: c.Popup, POPUP_TYPE: c.POPUP_TYPE };
+        }
+    } catch(e) {}
+    return null;
+}
+
+async function showGenerateModal() {
     const s = getSettings();
     const sg = s.defaultGenres || ["drama"];
     const gcb = Object.entries(GENRES).map(([k,v])=>'<label><input type="checkbox" value="'+k+'"'+(sg.includes(k)?' checked':'')+'> '+v+'</label>').join("");
 
-    $("body").append(`
-    <div class="pd-modal-overlay" id="pd_generate_overlay"><div class="pd-modal">
-        <div class="pd-modal-header"><span>🎬 Generate New Plot</span><button class="pd-modal-close" id="pd_gen_close">&times;</button></div>
-        <div class="pd-modal-body">
-            <div class="pd-field"><label>Number of steps</label><div class="pd-range-row"><input type="range" id="pd_gen_count" min="2" max="20" value="${s.defaultStepCount}"><span class="pd-range-val" id="pd_gen_count_val">${s.defaultStepCount}</span></div></div>
-            <div class="pd-field"><label>Time span</label><select id="pd_gen_timespan">${optTags(TIMESPANS,s.defaultTimespan)}</select></div>
-            <div class="pd-field"><label>Anti-spoiler language</label><select id="pd_gen_lang">${optTags(LANGUAGES,s.defaultLanguage)}</select></div>
-            <div class="pd-field"><label>Genres</label><div class="pd-genre-grid" id="pd_gen_genres">${gcb}</div></div>
-            <div class="pd-field"><label>Epicness</label><div class="pd-range-row"><input type="range" id="pd_gen_epic" min="1" max="10" value="${s.defaultEpicness}"><span class="pd-range-val" id="pd_gen_epic_val">${s.defaultEpicness}</span></div></div>
-            <div class="pd-field"><label>Realism</label><div class="pd-range-row"><input type="range" id="pd_gen_real" min="1" max="10" value="${s.defaultRealism}"><span class="pd-range-val" id="pd_gen_real_val">${s.defaultRealism}</span></div></div>
-            <div class="pd-field"><label>Token budget (0 = no limit)</label><input type="number" id="pd_gen_tokens" min="0" max="30000" step="500" value="${s.defaultTokenBudget}" class="pd-token-input"></div>
-            <div class="pd-field"><label>Custom direction (optional)</label><textarea id="pd_gen_custom" placeholder="Направление сюжета, фокус на персонажах, конкретные события..."></textarea></div>
-            <p class="pd-note">${useCustomProfile() ? "⚡ Generation profile: "+s.genProfile : "Uses current ST connection + full context."}</p>
-        </div>
-        <div class="pd-modal-footer">
-            <div class="menu_button" id="pd_gen_cancel">Cancel</div>
-            <div class="menu_button" id="pd_gen_submit" style="font-weight:600;"><i class="fa-solid fa-wand-magic-sparkles"></i> Generate</div>
-        </div>
-    </div></div>`);
+    const html = `
+    <div class="pd-popup-content">
+        <h3 style="margin-top:0;">🎬 Generate New Plot</h3>
+        <div class="pd-field"><label>Number of steps</label><div class="pd-range-row"><input type="range" id="pd_gen_count" min="2" max="20" value="${s.defaultStepCount}"><span class="pd-range-val" id="pd_gen_count_val">${s.defaultStepCount}</span></div></div>
+        <div class="pd-field"><label>Time span</label><select id="pd_gen_timespan">${optTags(TIMESPANS,s.defaultTimespan)}</select></div>
+        <div class="pd-field"><label>Anti-spoiler language</label><select id="pd_gen_lang">${optTags(LANGUAGES,s.defaultLanguage)}</select></div>
+        <div class="pd-field"><label>Genres</label><div class="pd-genre-grid" id="pd_gen_genres">${gcb}</div></div>
+        <div class="pd-field"><label>Epicness</label><div class="pd-range-row"><input type="range" id="pd_gen_epic" min="1" max="10" value="${s.defaultEpicness}"><span class="pd-range-val" id="pd_gen_epic_val">${s.defaultEpicness}</span></div></div>
+        <div class="pd-field"><label>Realism</label><div class="pd-range-row"><input type="range" id="pd_gen_real" min="1" max="10" value="${s.defaultRealism}"><span class="pd-range-val" id="pd_gen_real_val">${s.defaultRealism}</span></div></div>
+        <div class="pd-field"><label>Token budget (0 = no limit)</label><input type="number" id="pd_gen_tokens" min="0" max="30000" step="500" value="${s.defaultTokenBudget}" class="pd-token-input"></div>
+        <div class="pd-field"><label>Custom direction (optional)</label><textarea id="pd_gen_custom" placeholder="Направление сюжета, фокус на персонажах, конкретные события..."></textarea></div>
+        <p class="pd-note">${useCustomProfile() ? "⚡ Generation profile: "+s.genProfile : "Uses current ST connection + full context."}</p>
+    </div>`;
 
-    $("#pd_gen_count").on("input", function(){$("#pd_gen_count_val").text(this.value)});
-    $("#pd_gen_epic").on("input", function(){$("#pd_gen_epic_val").text(this.value)});
-    $("#pd_gen_real").on("input", function(){$("#pd_gen_real_val").text(this.value)});
-    const close = ()=>$("#pd_generate_overlay").remove();
-    $("#pd_gen_close,#pd_gen_cancel").on("click", close);
-    $("#pd_generate_overlay").on("click", function(e){ if(e.target===this) close(); });
+    const P = getPopupClass();
+    if (!P) { toastr.error("Popup class not available."); return; }
 
-    $("#pd_gen_submit").on("click", async function() {
-        const genres=[]; $("#pd_gen_genres input:checked").each(function(){genres.push($(this).val())}); if(!genres.length) genres.push("drama");
-        const opts = {
-            stepCount: parseInt($("#pd_gen_count").val()), timespan: $("#pd_gen_timespan").val(),
-            language: $("#pd_gen_lang").val(), genres, epicness: parseInt($("#pd_gen_epic").val()),
-            realism: parseInt($("#pd_gen_real").val()), tokenBudget: parseInt($("#pd_gen_tokens").val())||0,
-            customDirection: $("#pd_gen_custom").val(),
-        };
-        const s=getSettings(); s.defaultStepCount=opts.stepCount; s.defaultTimespan=opts.timespan;
-        s.defaultLanguage=opts.language; s.defaultGenres=opts.genres; s.defaultEpicness=opts.epicness;
-        s.defaultRealism=opts.realism; s.defaultTokenBudget=opts.tokenBudget;
-        $(".pd-modal-body").html('<div class="pd-loading"><div class="pd-spinner"></div><div class="pd-loading-text">Generating plot…</div></div>');
-        $(".pd-modal-footer").hide();
-        const result = await generatePlot(opts);
-        close(); if(!result) showGenerateModal();
+    const popup = new P.Popup(html, P.POPUP_TYPE.CONFIRM, "", {
+        okButton: "Generate",
+        cancelButton: "Cancel",
+        wide: false,
+        allowVerticalScrolling: true,
+        onOpen: () => {
+            $("#pd_gen_count").on("input", function(){$("#pd_gen_count_val").text(this.value)});
+            $("#pd_gen_epic").on("input", function(){$("#pd_gen_epic_val").text(this.value)});
+            $("#pd_gen_real").on("input", function(){$("#pd_gen_real_val").text(this.value)});
+        },
     });
+
+    const result = await popup.show();
+    if (!result) return; // cancelled
+
+    // Collect values BEFORE popup DOM is removed — read from popup content
+    const $c = $(popup.content || popup.dlg || document);
+    const genres = [];
+    $c.find("#pd_gen_genres input:checked").each(function(){genres.push($(this).val())});
+    if (!genres.length) genres.push("drama");
+
+    const opts = {
+        stepCount: parseInt($c.find("#pd_gen_count").val()) || s.defaultStepCount,
+        timespan: $c.find("#pd_gen_timespan").val() || s.defaultTimespan,
+        language: $c.find("#pd_gen_lang").val() || s.defaultLanguage,
+        genres,
+        epicness: parseInt($c.find("#pd_gen_epic").val()) || s.defaultEpicness,
+        realism: parseInt($c.find("#pd_gen_real").val()) || s.defaultRealism,
+        tokenBudget: parseInt($c.find("#pd_gen_tokens").val()) || 0,
+        customDirection: $c.find("#pd_gen_custom").val() || "",
+    };
+
+    s.defaultStepCount=opts.stepCount; s.defaultTimespan=opts.timespan;
+    s.defaultLanguage=opts.language; s.defaultGenres=opts.genres;
+    s.defaultEpicness=opts.epicness; s.defaultRealism=opts.realism;
+    s.defaultTokenBudget=opts.tokenBudget;
+
+    toastr.info("Plot Director: generating plot…");
+    await generatePlot(opts);
 }
 
-// ── UI: Steps Modal (two views) ──────────────────────────────
+// ── UI: Steps Modal (two views, native Popup) ────────────────
 
-function showStepsModal() {
+async function showStepsModal() {
     const pd = getPlotData();
     if (!pd || !pd.steps.length) { toastr.warning("No active plot."); return; }
     const lang = pd.genSettings?.language || "ko";
     const blur = ["en","ru"].includes(lang) ? "spoiler-blur" : "";
 
-    // Individual steps view
     const stepsHTML = pd.steps.map((step,i) => {
         const st = step.completed ? "completed" : i===pd.currentIndex ? "active" : "pending";
         return '<li class="pd-step-item '+st+'" data-step-index="'+i+'"><div class="pd-step-badge '+st+'">'+(i+1)+'</div><div class="pd-step-content"><div class="pd-step-text '+blur+'" data-step-index="'+i+'">'+esc(step.text)+'</div></div><div class="pd-step-actions"><button class="pd-step-edit-btn" data-step-index="'+i+'" title="Edit">✎</button><button class="pd-step-goto-btn" data-step-index="'+i+'" title="Go to">→</button></div></li>';
     }).join("");
 
-    // Raw text view
     const rawText = pd.steps.map((s,i) => "[STEP "+(i+1)+"]: " + s.text).join("\n\n");
 
-    $("body").append(`
-    <div class="pd-modal-overlay" id="pd_steps_overlay"><div class="pd-modal" style="max-width:620px;">
-        <div class="pd-modal-header"><span>📋 Plot Steps (${pd.currentIndex+1}/${pd.steps.length})</span><button class="pd-modal-close" id="pd_steps_close">&times;</button></div>
-        <div class="pd-modal-body">
-            <div class="pd-tabs">
-                <span class="pd-tab active" data-tab="steps">Steps</span>
-                <span class="pd-tab" data-tab="raw">Raw Text</span>
-            </div>
-            <div class="pd-tab-content" id="pd_tab_steps">
-                ${blur ? '<p class="pd-note">Click blurred text to reveal.</p>' : ""}
-                <ul class="pd-step-list">${stepsHTML}</ul>
-            </div>
-            <div class="pd-tab-content" id="pd_tab_raw" style="display:none;">
-                <textarea class="pd-raw-textarea" id="pd_raw_text">${esc(rawText)}</textarea>
-                <div style="display:flex;gap:6px;margin-top:6px;">
-                    <div class="menu_button" id="pd_raw_copy" style="font-size:0.85em;"><i class="fa-solid fa-copy"></i> Copy</div>
-                    <div class="menu_button" id="pd_raw_save" style="font-size:0.85em;"><i class="fa-solid fa-floppy-disk"></i> Save edits</div>
-                </div>
+    const html = `
+    <div class="pd-popup-content">
+        <h3 style="margin-top:0;">📋 Plot Steps (${pd.currentIndex+1}/${pd.steps.length})</h3>
+        <div class="pd-tabs">
+            <span class="pd-tab active" data-tab="steps">Steps</span>
+            <span class="pd-tab" data-tab="raw">Raw Text</span>
+            <span class="pd-tab-spacer"></span>
+            <span class="pd-tab" id="pd_steps_reveal_all" title="Toggle all spoilers"><i class="fa-solid fa-eye"></i></span>
+        </div>
+        <div class="pd-tab-content" id="pd_tab_steps">
+            ${blur ? '<p class="pd-note">Click blurred text to reveal.</p>' : ""}
+            <ul class="pd-step-list">${stepsHTML}</ul>
+        </div>
+        <div class="pd-tab-content" id="pd_tab_raw" style="display:none;">
+            <textarea class="pd-raw-textarea" id="pd_raw_text">${esc(rawText)}</textarea>
+            <div style="display:flex;gap:6px;margin-top:6px;">
+                <div class="menu_button" id="pd_raw_copy" style="font-size:0.85em;"><i class="fa-solid fa-copy"></i> Copy</div>
+                <div class="menu_button" id="pd_raw_save" style="font-size:0.85em;"><i class="fa-solid fa-floppy-disk"></i> Save edits</div>
             </div>
         </div>
-        <div class="pd-modal-footer">
-            <div class="menu_button" id="pd_steps_reveal_all"><i class="fa-solid fa-eye"></i> Toggle All</div>
-            <div class="menu_button" id="pd_steps_done">Close</div>
-        </div>
-    </div></div>`);
+    </div>`;
 
-    const close = ()=>$("#pd_steps_overlay").remove();
-    $("#pd_steps_close,#pd_steps_done").on("click", close);
-    $("#pd_steps_overlay").on("click", function(e){ if(e.target===this) close(); });
+    const P = getPopupClass();
+    if (!P) { toastr.error("Popup class not available."); return; }
 
-    // Tabs
-    $(".pd-tab").on("click", function() {
-        $(".pd-tab").removeClass("active"); $(this).addClass("active");
-        $(".pd-tab-content").hide(); $("#pd_tab_"+$(this).data("tab")).show();
+    const popup = new P.Popup(html, P.POPUP_TYPE.TEXT, "", {
+        okButton: "Close",
+        wide: true,
+        allowVerticalScrolling: true,
+        onOpen: () => {
+            const $root = $(popup.content || popup.dlg);
+
+            // Tabs
+            $root.find(".pd-tab[data-tab]").on("click", function() {
+                $root.find(".pd-tab").removeClass("active"); $(this).addClass("active");
+                $root.find(".pd-tab-content").hide();
+                $root.find("#pd_tab_"+$(this).data("tab")).show();
+            });
+
+            // Spoiler toggle
+            $root.find(".pd-step-text.spoiler-blur").on("click", function(){$(this).toggleClass("revealed")});
+            $root.find("#pd_steps_reveal_all").on("click", function(){
+                const $b=$root.find(".pd-step-text.spoiler-blur"), h=$b.not(".revealed").length>0;
+                $b.toggleClass("revealed",h);
+            });
+
+            // Copy raw
+            $root.find("#pd_raw_copy").on("click", function(){
+                const t = $root.find("#pd_raw_text").val();
+                navigator.clipboard.writeText(t).then(()=>toastr.info("Copied!")).catch(()=>{
+                    $root.find("#pd_raw_text")[0].select(); document.execCommand("copy"); toastr.info("Copied!");
+                });
+            });
+
+            // Save raw edits
+            $root.find("#pd_raw_save").on("click", function(){
+                const txt = $root.find("#pd_raw_text").val();
+                const parsed = parseSteps(txt);
+                if (parsed.length === 0) { toastr.error("Could not parse steps."); return; }
+                const pd2 = getPlotData(); if (!pd2) return;
+                pd2.steps = parsed.map((t,i) => ({ text: t, completed: pd2.steps[i] ? pd2.steps[i].completed : false }));
+                if (pd2.currentIndex >= pd2.steps.length) pd2.currentIndex = pd2.steps.length - 1;
+                savePlotData(pd2); injectCurrentStep(); updatePanel();
+                popup.complete(1); showStepsModal();
+                toastr.success("Steps updated (" + parsed.length + " steps).");
+            });
+
+            // Edit step
+            $root.find(".pd-step-edit-btn").on("click", function(){
+                const idx=parseInt($(this).data("step-index"));
+                const $c=$(this).closest(".pd-step-item").find(".pd-step-content"), $t=$c.find(".pd-step-text");
+                if ($c.find(".pd-step-edit-area").length) return;
+                $t.hide();
+                $c.append('<textarea class="pd-step-edit-area">'+esc(pd.steps[idx].text)+'</textarea><div style="display:flex;gap:4px;margin-top:4px;"><button class="pd-step-save-btn menu_button" style="font-size:0.8em;padding:2px 8px;">Save</button><button class="pd-step-cancel-btn" style="font-size:0.8em;padding:2px 8px;background:none;border:1px solid rgba(255,255,255,0.15);color:inherit;border-radius:3px;cursor:pointer;">Cancel</button></div>');
+                $c.find(".pd-step-save-btn").on("click",function(){
+                    const v=$c.find(".pd-step-edit-area").val().trim();
+                    if(v){pd.steps[idx].text=v;savePlotData(pd);if(idx===pd.currentIndex)injectCurrentStep();}
+                    popup.complete(1); showStepsModal();
+                });
+                $c.find(".pd-step-cancel-btn").on("click",function(){$c.find(".pd-step-edit-area,div:last-child").remove();$t.show();});
+            });
+
+            // Go-to step
+            $root.find(".pd-step-goto-btn").on("click", function(){
+                const idx=parseInt($(this).data("step-index")), p=getPlotData(); if(!p)return;
+                p.steps.forEach((s,i)=>{s.completed=i<idx}); p.currentIndex=idx; p.lastAdvancedMsg=-1;
+                savePlotData(p);injectCurrentStep();updatePanel();
+                popup.complete(1); showStepsModal();
+                toastr.info("Jumped to step "+(idx+1)+".");
+            });
+        },
     });
 
-    // Spoiler toggle
-    $(".pd-step-text.spoiler-blur").on("click", function(){$(this).toggleClass("revealed")});
-    $("#pd_steps_reveal_all").on("click", function(){
-        const $b=$(".pd-step-text.spoiler-blur"), h=$b.not(".revealed").length>0; $b.toggleClass("revealed",h);
-    });
-
-    // Copy raw
-    $("#pd_raw_copy").on("click", function(){
-        navigator.clipboard.writeText($("#pd_raw_text").val()).then(()=>toastr.info("Copied!")).catch(()=>{
-            $("#pd_raw_text").select(); document.execCommand("copy"); toastr.info("Copied!");
-        });
-    });
-
-    // Save raw edits
-    $("#pd_raw_save").on("click", function(){
-        const txt = $("#pd_raw_text").val();
-        const parsed = parseSteps(txt);
-        if (parsed.length === 0) { toastr.error("Could not parse steps."); return; }
-        const pd2 = getPlotData(); if (!pd2) return;
-        // Preserve completion status for existing steps, add new ones as pending
-        pd2.steps = parsed.map((t,i) => ({
-            text: t,
-            completed: pd2.steps[i] ? pd2.steps[i].completed : false,
-        }));
-        if (pd2.currentIndex >= pd2.steps.length) pd2.currentIndex = pd2.steps.length - 1;
-        savePlotData(pd2); injectCurrentStep(); updatePanel();
-        close(); showStepsModal();
-        toastr.success("Steps updated (" + parsed.length + " steps).");
-    });
-
-    // Edit step
-    $(".pd-step-edit-btn").on("click", function(){
-        const idx=parseInt($(this).data("step-index"));
-        const $c=$(this).closest(".pd-step-item").find(".pd-step-content"), $t=$c.find(".pd-step-text");
-        if ($c.find(".pd-step-edit-area").length) return;
-        $t.hide();
-        $c.append('<textarea class="pd-step-edit-area">'+esc(pd.steps[idx].text)+'</textarea><div style="display:flex;gap:4px;margin-top:4px;"><button class="pd-step-save-btn menu_button" style="font-size:0.8em;padding:2px 8px;">Save</button><button class="pd-step-cancel-btn" style="font-size:0.8em;padding:2px 8px;background:none;border:1px solid rgba(255,255,255,0.15);color:inherit;border-radius:3px;cursor:pointer;">Cancel</button></div>');
-        $c.find(".pd-step-save-btn").on("click",function(){
-            const v=$c.find(".pd-step-edit-area").val().trim();
-            if(v){pd.steps[idx].text=v;savePlotData(pd);if(idx===pd.currentIndex)injectCurrentStep();}
-            close();showStepsModal();
-        });
-        $c.find(".pd-step-cancel-btn").on("click",function(){$c.find(".pd-step-edit-area,div:last-child").remove();$t.show();});
-    });
-
-    // Go-to step
-    $(".pd-step-goto-btn").on("click", function(){
-        const idx=parseInt($(this).data("step-index")), p=getPlotData(); if(!p)return;
-        p.steps.forEach((s,i)=>{s.completed=i<idx}); p.currentIndex=idx; p.lastAdvancedMsg=-1;
-        savePlotData(p);injectCurrentStep();updatePanel();close();showStepsModal();
-        toastr.info("Jumped to step "+(idx+1)+".");
-    });
+    await popup.show();
 }
 
 // ── Utility ──────────────────────────────────────────────────

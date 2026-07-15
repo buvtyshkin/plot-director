@@ -1,4 +1,5 @@
 /* ===== Plot Director — Extension Styles ===== */
+/* Modals use ST's native Popup — we only style the content inside. */
 
 /* --- Panel in Extensions Sidebar --- */
 #plot_director_panel .pd-status {
@@ -13,297 +14,138 @@
 }
 
 #plot_director_panel .pd-status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
 }
-
 #plot_director_panel .pd-status-dot.inactive { background: #666; }
 #plot_director_panel .pd-status-dot.active   { background: #4caf50; }
-#plot_director_panel .pd-status-dot.complete  { background: #2196f3; }
+#plot_director_panel .pd-status-dot.complete { background: #2196f3; }
 
 #plot_director_panel .pd-btn-row {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-    margin-bottom: 6px;
+    display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px;
 }
-
 #plot_director_panel .pd-btn-row .menu_button {
-    flex: 1;
-    min-width: 0;
-    font-size: 0.85em;
-    padding: 4px 8px;
-    white-space: nowrap;
+    flex: 1; min-width: 0; font-size: 0.85em; padding: 4px 8px; white-space: nowrap;
 }
-
 #plot_director_panel .pd-toggle-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.85em;
-    padding: 4px 0;
+    display: flex; align-items: center; gap: 6px; font-size: 0.85em; padding: 4px 0;
 }
 
-/* --- Modal Overlay --- */
-.pd-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.75);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(3px);
+/* --- Popup Content --- */
+.pd-popup-content {
+    text-align: left;
 }
 
-.pd-modal {
-    background: #1a1b2e;
-    color: #ddd;
-    border: 1px solid #3a3b4e;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 560px;
-    max-height: 85vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-}
-
-.pd-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid #3a3b4e;
-    font-size: 1.05em;
-    font-weight: 600;
-    color: #eee;
-}
-
-.pd-modal-close {
-    cursor: pointer;
-    font-size: 1.3em;
-    opacity: 0.6;
-    transition: opacity 0.15s;
-    background: none;
-    border: none;
-    color: #ccc;
-    padding: 2px 6px;
-}
-
-.pd-modal-close:hover { opacity: 1; }
-
-.pd-modal-body {
-    padding: 16px;
-    overflow-y: auto;
-    flex: 1;
-}
-
-.pd-modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 12px 16px;
-    border-top: 1px solid #3a3b4e;
-}
-
-/* --- Form Controls --- */
-.pd-field {
-    margin-bottom: 14px;
-}
-
+/* --- Form Fields (inherit ST popup theme colors) --- */
+.pd-field { margin-bottom: 12px; }
 .pd-field label {
-    display: block;
-    font-size: 0.85em;
-    margin-bottom: 4px;
-    color: #aaa;
+    display: block; font-size: 0.85em; margin-bottom: 4px; opacity: 0.7;
 }
-
 .pd-field select,
 .pd-field textarea,
-.pd-field input[type="text"] {
+.pd-field input[type="text"],
+.pd-field input[type="number"],
+.pd-token-input {
     width: 100%;
     padding: 6px 8px;
-    border: 1px solid #3a3b4e;
-    border-radius: 4px;
-    background: #12132a;
-    color: #ddd;
-    font-family: inherit;
-    font-size: 0.9em;
     box-sizing: border-box;
+    font-family: inherit;
+    font-size: 0.95em;
+}
+.pd-field textarea { min-height: 60px; resize: vertical; }
+
+.pd-range-row { display: flex; align-items: center; gap: 8px; }
+.pd-range-row input[type="range"] { flex: 1; }
+.pd-range-val { min-width: 28px; text-align: center; font-size: 0.9em; font-weight: 600; }
+
+/* --- Genre Checkbox Grid --- */
+.pd-genre-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px;
+}
+.pd-genre-grid label {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 0.85em; cursor: pointer; padding: 3px 0;
 }
 
-.pd-field textarea {
-    min-height: 60px;
-    resize: vertical;
+/* --- Profile Select --- */
+.pd-profile-select {
+    width: 100%; padding: 5px 6px; box-sizing: border-box;
+    font-family: inherit; font-size: 0.85em;
 }
 
-.pd-field select option {
-    background: #12132a;
-    color: #ddd;
+/* --- Tabs --- */
+.pd-tabs {
+    display: flex; gap: 0; margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
 }
-
-.pd-range-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.pd-tab {
+    padding: 8px 16px; font-size: 0.9em; cursor: pointer; opacity: 0.5;
+    border-bottom: 2px solid transparent; transition: opacity 0.15s;
+    display: flex; align-items: center;
 }
-
-.pd-range-row input[type="range"] {
-    flex: 1;
-    accent-color: #e88c3a;
-}
-
-.pd-range-val {
-    min-width: 28px;
-    text-align: center;
-    font-size: 0.9em;
-    font-weight: 600;
-    color: #eee;
-}
+.pd-tab:hover { opacity: 0.8; }
+.pd-tab.active { opacity: 1; border-bottom-color: #e88c3a; }
+.pd-tab-spacer { flex: 1; }
 
 /* --- Step List --- */
-.pd-step-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
+.pd-step-list { list-style: none; padding: 0; margin: 0; }
 
 .pd-step-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 8px 10px;
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 8px 6px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
-    transition: background 0.15s;
     border-radius: 4px;
 }
-
-.pd-step-item:hover {
-    background: rgba(255,255,255,0.04);
-}
-
-.pd-step-item.completed .pd-step-badge {
-    background: #4caf50;
-}
-
-.pd-step-item.active .pd-step-badge {
-    background: #e88c3a;
-    animation: pd-pulse 2s ease-in-out infinite;
-}
-
-.pd-step-item.pending .pd-step-badge {
-    background: #555;
-}
+.pd-step-item:hover { background: rgba(255,255,255,0.04); }
 
 .pd-step-badge {
-    min-width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75em;
-    font-weight: 700;
-    color: #fff;
-    flex-shrink: 0;
-    margin-top: 2px;
+    min-width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75em; font-weight: 700; color: #fff;
+    flex-shrink: 0; margin-top: 2px;
 }
+.pd-step-badge.completed { background: #4caf50; }
+.pd-step-badge.active { background: #e88c3a; animation: pd-pulse 2s ease-in-out infinite; }
+.pd-step-badge.pending { background: #555; }
 
-.pd-step-content {
-    flex: 1;
-    min-width: 0;
-}
-
+.pd-step-content { flex: 1; min-width: 0; }
 .pd-step-text {
-    font-size: 0.88em;
-    line-height: 1.45;
-    word-break: break-word;
-    color: #ccc;
+    font-size: 0.88em; line-height: 1.45; word-break: break-word;
 }
 
 .pd-step-text.spoiler-blur {
-    filter: blur(5px);
-    user-select: none;
-    cursor: pointer;
-    transition: filter 0.25s;
+    filter: blur(5px); user-select: none; cursor: pointer; transition: filter 0.25s;
 }
+.pd-step-text.spoiler-blur:hover { filter: blur(3px); }
+.pd-step-text.spoiler-blur.revealed { filter: none; user-select: auto; cursor: auto; }
 
-.pd-step-text.spoiler-blur:hover {
-    filter: blur(3px);
-}
-
-.pd-step-text.spoiler-blur.revealed {
-    filter: none;
-    user-select: auto;
-    cursor: auto;
-}
-
-.pd-step-actions {
-    display: flex;
-    gap: 4px;
-    flex-shrink: 0;
-}
-
+.pd-step-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .pd-step-actions button {
-    background: none;
-    border: 1px solid rgba(255,255,255,0.15);
-    color: #aaa;
-    padding: 2px 6px;
-    border-radius: 3px;
-    cursor: pointer;
-    font-size: 0.8em;
-    transition: opacity 0.15s;
+    background: none; border: 1px solid rgba(255,255,255,0.2);
+    color: inherit; opacity: 0.65;
+    padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.85em;
+    min-width: 32px; min-height: 32px;
 }
-
-.pd-step-actions button:hover {
-    color: #eee;
-    border-color: rgba(255,255,255,0.3);
-}
+.pd-step-actions button:hover { opacity: 1; }
 
 /* --- Edit Step Inline --- */
 .pd-step-edit-area {
-    width: 100%;
-    min-height: 50px;
-    margin-top: 6px;
-    padding: 6px;
-    border: 1px solid #3a3b4e;
-    border-radius: 4px;
-    background: #12132a;
-    color: #ddd;
-    font-family: inherit;
-    font-size: 0.85em;
-    resize: vertical;
+    width: 100%; min-height: 50px; margin-top: 6px; padding: 6px;
+    box-sizing: border-box; font-family: inherit; font-size: 0.85em; resize: vertical;
 }
 
-/* --- Loading Spinner --- */
-.pd-loading {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 32px;
-    gap: 12px;
+/* --- Raw Text View --- */
+.pd-raw-textarea {
+    width: 100%; min-height: 300px; padding: 10px;
+    box-sizing: border-box; font-family: monospace;
+    font-size: 0.85em; line-height: 1.5; resize: vertical;
 }
 
-.pd-spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid rgba(255,255,255,0.15);
-    border-top-color: #e88c3a;
-    border-radius: 50%;
-    animation: pd-spin 0.8s linear infinite;
+/* --- Misc --- */
+.pd-divider {
+    border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 10px 0;
 }
-
-.pd-loading-text {
-    font-size: 0.9em;
-    color: #999;
-}
-
-@keyframes pd-spin {
-    to { transform: rotate(360deg); }
+.pd-note {
+    font-size: 0.8em; opacity: 0.5; font-style: italic; margin-top: 4px;
 }
 
 @keyframes pd-pulse {
@@ -311,217 +153,14 @@
     50% { opacity: 0.5; }
 }
 
-/* --- Misc --- */
-.pd-divider {
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.08);
-    margin: 10px 0;
-}
-
-.pd-note {
-    font-size: 0.8em;
-    color: #777;
-    font-style: italic;
-    margin-top: 4px;
-}
-
-.pd-empty-state {
-    text-align: center;
-    padding: 24px 16px;
-    color: #666;
-    font-size: 0.9em;
-}
-
-/* --- Genre Checkbox Grid --- */
-.pd-genre-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2px 12px;
-}
-
-.pd-genre-grid label {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.85em;
-    color: #ccc;
-    cursor: pointer;
-    padding: 2px 0;
-}
-
-.pd-genre-grid input[type="checkbox"] {
-    accent-color: #e88c3a;
-}
-
-/* --- Tabs --- */
-.pd-tabs {
-    display: flex;
-    gap: 0;
-    margin-bottom: 12px;
-    border-bottom: 1px solid #3a3b4e;
-}
-.pd-tab {
-    padding: 6px 16px;
-    font-size: 0.9em;
-    cursor: pointer;
-    opacity: 0.5;
-    border-bottom: 2px solid transparent;
-    transition: opacity 0.15s;
-}
-.pd-tab:hover { opacity: 0.8; }
-.pd-tab.active { opacity: 1; border-bottom-color: #e88c3a; }
-
-/* --- Raw Text View --- */
-.pd-raw-textarea {
-    width: 100%;
-    min-height: 300px;
-    padding: 10px;
-    border: 1px solid #3a3b4e;
-    border-radius: 4px;
-    background: #12132a;
-    color: #ccc;
-    font-family: monospace;
-    font-size: 0.85em;
-    line-height: 1.5;
-    resize: vertical;
-    box-sizing: border-box;
-}
-
-/* --- Token Input --- */
-.pd-token-input {
-    width: 100%;
-    padding: 6px 8px;
-    border: 1px solid #3a3b4e;
-    border-radius: 4px;
-    background: #12132a;
-    color: #ddd;
-    font-family: inherit;
-    font-size: 0.9em;
-    box-sizing: border-box;
-}
-
-/* --- API Input Fields --- */
-.pd-api-input {
-    width: 100%;
-    padding: 4px 6px;
-    margin-bottom: 3px;
-    border: 1px solid #3a3b4e;
-    border-radius: 3px;
-    background: #12132a;
-    color: #ccc;
-    font-family: inherit;
-    font-size: 0.8em;
-    box-sizing: border-box;
-}
-.pd-api-input::placeholder { color: #555; }
-
-/* --- Profile Select --- */
-.pd-profile-select {
-    width: 100%;
-    padding: 5px 6px;
-    border: 1px solid #3a3b4e;
-    border-radius: 3px;
-    background: #12132a;
-    color: #ccc;
-    font-family: inherit;
-    font-size: 0.85em;
-    box-sizing: border-box;
-}
-.pd-profile-select option { background: #12132a; color: #ccc; }
-
-/* --- Mobile: fullscreen modal approach --- */
+/* --- Mobile: minor touch-target tweaks only. Popup layout is ST's job. --- */
 @media (max-width: 768px) {
-    .pd-modal-overlay {
-        /* Fullscreen fixed overlay, no flex centering games */
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        display: block !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        overflow: hidden !important;
-        z-index: 99999 !important;
-        background: #1a1b2e !important;
+    .pd-genre-grid { grid-template-columns: 1fr 1fr; }
+    .pd-genre-grid label { min-height: 30px; }
+    .pd-field select, .pd-field textarea,
+    .pd-field input[type="text"], .pd-field input[type="number"],
+    .pd-token-input, .pd-raw-textarea {
+        font-size: 16px; /* prevents iOS zoom */
     }
-    .pd-modal {
-        /* Modal fills the entire overlay */
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        height: 100% !important;
-        max-height: 100% !important;
-        margin: 0 !important;
-        border: none !important;
-        border-radius: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        box-shadow: none !important;
-    }
-    .pd-modal-header {
-        flex: 0 0 auto;
-        padding: 12px;
-        font-size: 1em;
-    }
-    .pd-modal-body {
-        flex: 1 1 auto;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        padding: 12px;
-        min-height: 0; /* critical for flex scroll */
-    }
-    .pd-modal-footer {
-        flex: 0 0 auto;
-        padding: 10px 12px;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-    .pd-modal-footer .menu_button {
-        min-height: 42px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex: 1;
-    }
-    .pd-modal-close {
-        padding: 8px 14px;
-        font-size: 1.5em;
-    }
-    .pd-step-actions button {
-        padding: 6px 10px;
-        min-width: 38px;
-        min-height: 38px;
-    }
-    .pd-genre-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-    .pd-genre-grid label {
-        padding: 6px 0;
-        min-height: 30px;
-    }
-    .pd-field select,
-    .pd-field textarea,
-    .pd-field input[type="text"],
-    .pd-field input[type="number"],
-    .pd-token-input {
-        font-size: 16px;
-        min-height: 40px;
-    }
-    .pd-raw-textarea {
-        min-height: 200px;
-        font-size: 16px;
-    }
-    .pd-tab {
-        padding: 10px 16px;
-        min-height: 40px;
-        display: flex;
-        align-items: center;
-    }
+    .pd-step-actions button { min-width: 38px; min-height: 38px; }
 }
